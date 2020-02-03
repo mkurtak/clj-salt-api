@@ -1,0 +1,6 @@
+{:src ["src"]
+ :deps {org.clojure/core.async {:mvn/version "0.7.559"}
+        cheshire               {:mvn/version "5.9.0"}
+        aleph                  {:mvn/version "0.4.7-alpha5"}}
+ :aliases {:test {:extra-paths ["test/src"]
+                  :extra-deps {expectations/clojure-test {:mvn/version "1.2.1"}}}}}
