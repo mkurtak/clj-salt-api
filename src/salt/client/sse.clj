@@ -162,37 +162,37 @@
        (assoc op :command :error :body (error-body op e))))))
 
 (defn sse
-  "Invoke `salt.api/sse` request and returns `resp-chan` which deliver SSE events, subscription responses and error.
+  "Invoke [[salt.api/sse]] request and returns `resp-chan` which deliver SSE events, subscription responses and error.
   
   This function
   * logs in user if not already logged in and handles unauthorized exception
   * creates infinite go-loop listens to `subs-chan` and write SSE to `resp-chan`
 
   To receive SSE events client should:
-  * create a `core.async/pub` on `resp-chan` and receive responses
-  * put {:type :subscribe :correlation-id} to subs-chan
-  * take for connection response from `resp-chan` {:type :connect :correlation-id} 
-  * execute `salt.client.request/request` with async client
-  * take SSE events
+  - create a [[core.async/pub]] on `resp-chan` and receive responses
+  - put {:type :subscribe :correlation-id} to subs-chan
+  - take for connection response from `resp-chan` {:type :connect :correlation-id} 
+  - execute [[salt.client.request/request]] with async client
+  - take SSE events
 
   Details:
   
   Takes values from `subs-chan`
   |:-------------------|:-----------|
-  | :type :subscribe   | Subscribe with correlation id |
-  | :type :unsubscribe | Unsubscribe  |
-  | :type :exit        | Quit go-loop |
+  | :type :subscribe   | Subscribe with correlation id
+  | :type :unsubscribe | Unsubscribe
+  | :type :exit        | Quit go-loop
   
   Channel will deliver:
   |:-----------------|:-----------|
-  | Exception        | Significat error occurs and SSE could not be delivered (e.g. connection error and reconnect fails). Client should return error. |
-  | `:type :data`    | SSE event. Body is parsed from json. |
-  | `:type :connect` | When subscription is made (with :correlation-id set) or on reconnect with :correlation-id :all or subscription error occurs (:error is set) |
+  | Exception        | Significat error occurs and SSE could not be delivered (e.g. connection error and reconnect fails). Client should return error.
+  | `:type :data`    | SSE event. Body is parsed from json.
+  | `:type :connect` | When subscription is made (with :correlation-id set) or on reconnect with :correlation-id :all or subscription error occurs (:error is set)
 
-  Behavior of this go-loop is specified with `salt.client/client`
-  * ::salt.core/sse-keep-alive? - create sse connection even if there are no subscribers
-  * ::salt.core/sse-max-retries - number errors could occur before go-loop is parked.
-  * ::salt.core/default-http-request - default request. will be merged with `req`"
+  Behavior of this go-loop is specified with [[salt.client/client]]
+  - ::salt.core/sse-keep-alive? - create sse connection even if there are no subscribers
+  - ::salt.core/sse-max-retries - number errors could occur before go-loop is parked
+  - ::salt.core/default-http-request - default request. will be merged with `req`"
   ([client-atom req subs-chan] (sse client-atom req subs-chan (a/chan)))
   ([client-atom req subs-chan resp-chan]
    (a/go (loop [{:keys [command body retry-timeout]

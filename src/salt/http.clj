@@ -1,3 +1,5 @@
+;; Copyright (c) Michal Kurťák
+;; All rights reserved.
 (ns salt.http
   (:require [aleph.http :as http]
             [byte-streams :as bs]
@@ -65,9 +67,7 @@
   * Exception if error occurs"
   [req]
   (let [resp-chan (a/promise-chan)]
-    (connect #(-> (http/request (merge req {:throw-exceptions? false
-                                            :connection-timeout 2000
-                                            :read-timeout 5000}))
+    (connect #(-> (http/request (merge req {:throw-exceptions? false}))
                   (d/chain response->channel-response))
              resp-chan)))
 
@@ -165,10 +165,10 @@
                                                      {:raw-stream? true})})))
 
 (defn sse
-  "Invoke `aleph.http/request` on SSE endpoint and stream response to core.async channel.
+  "Invoke [[aleph.http/request]] on SSE endpoint and stream response to core.async channel.
 
   Uses pool defined in `sse-pool` -> with 1 connection and raw-stream? option.
-  Pool could be customized with `pool-opts` (see `aleph.http/request` documentation).
+  Pool could be customized with `pool-opts` (see [[aleph.http/request]] documentation).
 
   Server-sent events is a stream of text lines separated by empty lines.
   

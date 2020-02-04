@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>clj-salt-api</groupId>
+  <artifactId>clj-salt-api</artifactId>
+  <version>2020.02.04</version>
+  <name>clj-salt-api</name>
+  <scm>
+    <connection>scm:git:git@github.com/mkurtak/clj-salt-api</connection>
+    <developerConnection>scm:git:git@github.com/mkurtak/clj-salt-api</developerConnection>
+    <url>https://github.com/mkurtak/clj-salt-api</url>
+    <tag>HEAD</tag>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.clojure</groupId>
+      <artifactId>clojure</artifactId>
+      <version>1.10.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.clojure</groupId>
+      <artifactId>core.async</artifactId>
+      <version>0.7.559</version>
+    </dependency>
+    <dependency>
+      <groupId>cheshire</groupId>
+      <artifactId>cheshire</artifactId>
+      <version>5.9.0</version>
+    </dependency>
+    <dependency>
+      <groupId>aleph</groupId>
+      <artifactId>aleph</artifactId>
+      <version>0.4.7-alpha5</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <sourceDirectory>src</sourceDirectory>
+  </build>
+  <repositories>
+    <repository>
+      <id>clojars</id>
+      <url>https://repo.clojars.org/</url>
+    </repository>
+  </repositories>
+</project>

@@ -1,3 +1,5 @@
+;; Copyright (c) Michal Kurťák
+;; All rights reserved.
 (ns salt.client
   (:require [clojure.core.async :as a]
             [salt.api :as api]
@@ -52,13 +54,13 @@
 (defn request
   "Executes salt request. Puts one response or error to `resp-chan`.
 
-  `client-atom` client created with `salt.client/client`
-  `req` ring request map (see `aleph.http/request` documentation)
+  `client-atom` client created with [[salt.client/client]]
+  `req` ring request map (see [[aleph.http/request]] documentation)
   `resp-chan` core.async channel to deliver response. defaults to chan
 
   `resp-chan` will deliver:
-  * Parsed salt-api response body
-  * Exception if error occurs (with response in meta)
+  - Parsed salt-api response body
+  - Exception if error occurs (with response in meta)
 
   Channel is closed after response is delivered."
   ([client-atom req] (request client-atom req (a/chan)))
@@ -68,17 +70,17 @@
 (defn request-async
   "Executes salt request on async client. Puts minion responses or error to `resp-chan`.
 
-  `client-atom` client created with `salt.client/client`
-  `req` ring request map (see `aleph.http/request` documentation)
+  `client-atom` client created with [[salt.client/client]]
+  `req` ring request map (see [[aleph.http/request]] documentation)
   `resp-chan` core.async channel to deliver response. defaults to chan
 
   `resp-chan` will deliver:
-  * For each minion a map consisting of keys [:
-  * Parsed salt-api response body
-  * Exception if error occurs (with response in meta)
+  - For each minion a map consisting of keys `[:minion :return :success]`
+  - Parsed salt-api response body
+  - Exception if error occurs (with response in meta)
 
   This function implements best practices for working with salt-api as defined in
-  https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices
+  [https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices
   If SSE reconnect occurs during the call, jobs.print_job is used to retrieve 
   the state of job. 
 
@@ -112,15 +114,24 @@
                                         ::s/max-sse-retries 3
                                         ::s/sse-keep-alive? true}))
 
-  (a/<!! (request salt-client {:form-params {:client "local"
-                                             :tgt "*"
-                                             :fun "cmd.run"
-                                             :arg "sleep 1"}}))
+  (def salt-client2 (salt.client/client {::s/master-url "http://localhost:8000"
+                                         ::s/username "saltapi"
+                                         ::s/password "saltapi"
+                                         ::s/max-sse-retries 3
+                                         ::s/sse-keep-alive? true}))
 
-  (a/<!! (a/into [] (request-async salt-client {:form-params {:client "local_async"
-                                                              :tgt "*"
-                                                              :fun "cmd.run"
-                                                              :arg "sleep 15"}})))
+  (clojure.core.async/<!! (request salt-client2
+                                   {:form-params {:client "local"
+                                                  :tgt "test2"
+                                                  :tgt_type "nodegroup"
+                                                  :fun "test.ping"}}))
+
+  (clojure.core.async/<!!
+   (clojure.core.async/into [] (request-async salt-client
+                                              {:form-params {:client "local_async"
+                                                             :tgt "test2"
+                                                             :tgt_type "nodegroup"
+                                                             :fun "test.ping"}})))
 
   (close salt-client)
 

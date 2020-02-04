@@ -125,10 +125,10 @@
 (defn request-async
   "Subscribe to `sse-pub`, invoke async client request and deliver responses in resp-chan.
 
-  This function uses `salt.client.request/request` to call async client.
+  This function uses [[salt.client.request/request]] to call async client.
   Channel will deliver:
-  * Exception if error occurs
-  * Parsed SSE events
+  - Exception if error occurs
+  - Parsed SSE events
 
   This function implements best practices for working with salt-api as defined in
   https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices
@@ -137,7 +137,7 @@
 
   Channel is closed after all minions return.
   Request will be merged with client default-http-request. 
-  See `salt.client/client` for more details. "
+  See [[salt.client/client]] for more details. "
   [client-atom req subs-chan sse-pub resp-chan]
   (let [correlation-id (java.util.UUID/randomUUID)
         conn-chan (a/chan)
