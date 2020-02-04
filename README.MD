@@ -30,7 +30,7 @@ clj-salt-api manages connection to /events endpoint and sends events to respecti
                           ::s/max-sse-retries 3
                           ::s/sse-keep-alive? true}))
 
-;; Execute async request and collect responses from all minions to one vector
+;; Execute async request and collect responses from all minions in one vector
 (a/<!! (a/into [] (salt/request-async client {:form-params {:client "local_async"
                                                             :tgt "*"
                                                             :fun "pkg.version"

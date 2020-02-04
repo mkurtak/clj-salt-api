@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>clj-salt-api</groupId>
   <artifactId>clj-salt-api</artifactId>
-  <version>2020.02.04</version>
+  <version>2020.02.04-SNAPSHOT</version>
   <name>clj-salt-api</name>
   <scm>
     <connection>scm:git:git@github.com/mkurtak/clj-salt-api</connection>
