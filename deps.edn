@@ -14,8 +14,11 @@
                  :main-opts ["-m" "hf.depstar.jar" "target/clj-salt-api.jar"]}
            :outdated {:extra-deps {olical/depot {:mvn/version "1.8.4"}}
                       :main-opts ["-m" "depot.outdated.main"]}
+           ;; - these rely on having a pom.xml file and, for deployment, these two
+           ;;   environment variables: CLOJARS_USERNAME, CLOJARS_PASSWORD
            :install {:extra-deps {deps-deploy {:mvn/version "0.0.9"}}
                      :main-opts ["-m" "deps-deploy.deps-deploy" "install"
                                  "target/clj-salt-api.jar"]}
            :deploy {:extra-deps {deps-deploy {:mvn/version "0.0.9"}}
-                    :main-opts ["-m" "deps-deploy.deps-deploy" "deploy"]}}}
+                    :main-opts ["-m" "deps-deploy.deps-deploy" "deploy"
+                                "target/clj-salt-api.jar"]}}}
