@@ -53,7 +53,7 @@
   (assoc op :command :request :body (create-request op)))
 
 (defn initial-op
-  [req client-atom]
+  [client-atom req]
   {:command :validate :request req :client @client-atom})
 
 (defn handle-response
@@ -83,7 +83,7 @@
   ([client-atom req] (request client-atom req (a/chan)))
   ([client-atom req resp-chan]
    (a/go (loop [{:keys [command body] :as op}
-                (initial-op req client-atom)]
+                (initial-op client-atom req)]
            (when command
              (->> (case command
                     :validate nil

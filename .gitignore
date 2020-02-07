@@ -1,5 +1,6 @@
 *.jar
 *.class
+.clj-kondo/
 /lib/
 /classes/
 /target/
@@ -9,4 +10,5 @@
 .lein-plugins/
 .lein-failures
 .nrepl-port
+.dir-locals.el
 .cpcache/

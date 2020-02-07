@@ -12,6 +12,25 @@
   [msg]
   (if (or (instance? Throwable msg) (= :connected (:type msg))) :connection :data))
 
+(defn client-not-started
+  "Create client atom with default values. Do not start sse."
+  [opts]
+  (atom (merge {::s/eauth "pam"
+                ::s/sse-keep-alive? true
+                ::s/max-sse-retries 3} opts)))
+
+(defn- client-start
+  [client-atom]
+  (let [subs-chan (a/chan)
+        resp-chan (a/chan)
+        pub (a/pub resp-chan sse-topic)]
+    (sse/sse client-atom subs-chan resp-chan)
+    (swap! client-atom assoc
+           :sse-subs-chan subs-chan
+           :sse-resp-chan resp-chan
+           :sse-pub pub)
+    client-atom))
+
 (defn client
   "Given a config map, create a client for saltstack api. Supported keys:
   
@@ -38,18 +57,7 @@
                                        SSE behaves as sse-keep-alive? false, 
                                        defaults to 3"
   [opts]
-  (let [client-atom (atom (merge {::s/eauth "pam"
-                                  ::s/sse-keep-alive? true
-                                  ::s/mas-sse-retries 3} opts))
-        subs-chan (a/chan)
-        resp-chan (a/chan)
-        pub (a/pub resp-chan sse-topic)]
-    (sse/sse client-atom {} subs-chan resp-chan)
-    (swap! client-atom assoc
-           :sse-subs-chan subs-chan
-           :sse-resp-chan resp-chan
-           :sse-pub pub)
-    client-atom))
+  (client-start (client-not-started opts)))
 
 (defn request
   "Executes salt request. Puts one response or error to `resp-chan`.
@@ -114,27 +122,23 @@
                                         ::s/max-sse-retries 3
                                         ::s/sse-keep-alive? true}))
 
-  (def salt-client2 (salt.client/client {::s/master-url "http://localhost:8000"
-                                         ::s/username "saltapi"
-                                         ::s/password "saltapi"
-                                         ::s/max-sse-retries 3
-                                         ::s/sse-keep-alive? true}))
-
-  (clojure.core.async/<!! (request salt-client2
+  (clojure.core.async/<!! (request salt-client
                                    {:form-params {:client "local"
-                                                  :tgt "test2"
-                                                  :tgt_type "nodegroup"
+                                                  :tgt "*"
                                                   :fun "test.ping"}}))
 
-  (clojure.core.async/<!!
-   (clojure.core.async/into [] (request-async salt-client
-                                              {:form-params {:client "local_async"
-                                                             :tgt "test2"
-                                                             :tgt_type "nodegroup"
-                                                             :fun "test.ping"}})))
+  (do
+    (def resp-chan (request-async salt-client
+                                  {:form-params {:client "local_async"
+                                                 :tgt "*"
+                                                 :fun "test.ping"}}))
+
+    (def resp-chan2 (request-async salt-client
+                                   {:form-params {:client "local_async"
+                                                  :tgt "*"
+                                                  :fun "test.version"}})))
+  (clojure.core.async/<!! resp-chan)
+  (clojure.core.async/<!! resp-chan2)
 
   (close salt-client)
-
-  salt-client
-
   )

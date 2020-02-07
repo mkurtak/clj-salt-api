@@ -1,69 +1,70 @@
 ;; Copyright (c) Michal Kurťák
 ;; All rights reserved.
-(ns src.salt.request-test
+(ns salt.request-test
   (:require [clojure.test :refer [deftest is testing]]
             [salt.client :as c]
             [salt.client.request :as r]
-            [salt.core :as s]))
+            [salt.core :as s]
+            [salt.test-utils :as u]))
 
-(defn- token
-  ([] (token 5000))
-  ([diff]
+(defn- login-resp
+  ([] (login-resp 5000))
+  ([expire-in]
    {:token "token"
-    :expire (/ (+ (System/currentTimeMillis) diff) 1000)}))
+    :expire (/ (+ (System/currentTimeMillis) expire-in) 1000)}))
+
+(defn- initial-op
+  ([] (initial-op nil))
+  ([login-response]
+   (r/initial-op (c/client-not-started
+                  {::s/master-url "/master"
+                   ::s/login-response login-response}) {:url "/test"})))
 
 (deftest request-test
-  (testing "request"
-    (let [client (c/client {:opts {:url "/master"}})
-          init-op (r/initial-op {:url "/test"} client)
-          r1 (r/handle-response init-op)          
-          r2 (r/handle-response r1 (token))
-          r3 (r/handle-response r2 nil)
-          r4 (r/handle-response r3 {:status 200})
-          r5 (r/handle-response r4)]
-      (is (= :login (:command r1)))
-      (is (= :swap-login (:command r2)))
-      (is (= :request (:command r3)))
-      (is (= :response (:command r4)))
-      (is (nil? (:command r5)))))
+  (testing "happyday"
+    (u/test-flow->
+     (initial-op) r
+     (is (= :login (:command r))) (r/handle-response nil)
+     (is (= :swap-login (:command r))) (r/handle-response (login-resp))
+     (is (= :request (:command r))) (r/handle-response nil)
+     (is (= :response (:command r))) (r/handle-response {:status 200})
+     (is (nil? (:command r))) (r/handle-response nil)))
+
+  (testing "login error"
+    (u/test-flow->
+     (initial-op) r
+     (is (= :login (:command r))) (r/handle-response nil)
+     (is (= :error (:command r))) (r/handle-response
+                                   (ex-info "Login exception" {}))))
   
-  (testing "request with valid token"
-    (let [client (c/client {:opts {:url "/master"}
-                            ::s/login-response (token)})
-          init-op (r/initial-op {:url "/test"} client)
-          r1 (r/handle-response init-op)
-          r2 (r/handle-response r1 {:status 200})
-          r3 (r/handle-response r2)]
-      (is (= :request (:command r1)))
-      (is (= :response (:command r2)))
-      (is (nil? (:command r3)))))
+  (testing "invalid token"
+    (u/test-flow->
+     (initial-op (login-resp -1000)) r
+     (is (= :login (:command r))) (r/handle-response nil)
+     (is (= :swap-login (:command r))) (r/handle-response (login-resp))))
+
+  (testing "valid token"
+    (u/test-flow->
+     (initial-op (login-resp)) r
+     (is (= :request (:command r))) (r/handle-response nil)))
   
-  (testing "request with invalid token"
-    (let [client (c/client {:opts {:url "/master"}
-                            ::s/login-response (token -5000)})
-          init-op (r/initial-op {:url "/test"} client)
-          r1 (r/handle-response init-op)
-          r2 (r/handle-response r1 (token))]
-      (is (= :login (:command r1)))
-      (is (= :swap-login (:command r2)))))
-  
-  (testing "request unauthorized"
-    (let [client (c/client {:opts {:url "/master"}
-                            ::s/login-response (token)})
-          init-op (r/initial-op {:url "/test"} client)
-          r1 (r/handle-response init-op)
-          r2 (r/handle-response r1 (ex-info
+  (testing "unauthorized error"
+    (u/test-flow->
+     (initial-op) r
+     (is (= :login (:command r))) (r/handle-response nil)
+     (is (= :swap-login (:command r))) (r/handle-response (login-resp))
+     (is (= :request (:command r))) (r/handle-response nil)
+     (is (= :login (:command r))) (r/handle-response
+                                   (ex-info
                                     "Unauthorized" {::s/response-category
-                                                    :unauthorized}))]
-      (is (= :request (:command r1)))
-      (is (= :login (:command r2)))))
-  (testing "handle request exception"
-    (let [client (c/client {:opts {:url "/master"} ::s/login-response (token)})
-          init-op (r/initial-op {:url "/test"} client)
-          r1 (r/handle-response init-op)
-          r2 (r/handle-response r1 (ex-info "Unexpected Error" {}))
-          r3 (r/handle-response r2)] 
-      (is (= :request (:command r1)))
-      (is (= :error (:command r2)))
-      (is (nil? r3)))))
+                                                    :unauthorized})))    )
+  
+  (testing "request exception"
+    (u/test-flow->
+     (initial-op) r
+     (is (= :login (:command r))) (r/handle-response nil)
+     (is (= :swap-login (:command r))) (r/handle-response (login-resp))
+     (is (= :request (:command r))) (r/handle-response nil)
+     (is (= :error (:command r))) (r/handle-response
+                                   (ex-info "Unexpected Error" {})))))
 

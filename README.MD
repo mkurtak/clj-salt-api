@@ -4,7 +4,7 @@
 
 ## Rationale
 
-clj-salt-api is data oriented Clojure library for invoking salt-api. You only need three functions at runtime: `client`, which creates a client, `request`, which invokes an sync operation on client and `request-async` which invokes async operation on client. Both request methods take a ring request and return a core.async channel that delivers the response/responses.
+clj-salt-api is data oriented Clojure library for invoking salt-api. You only need three functions at runtime: `client`, which creates clj-salt-api client, `request`, which invokes sync operation on the client and `request-async` which invokes async operation on the client. Both request methods take a ring request as a parameter and return a core.async channel that delivers the response/responses.
 
 clj-salt-api handles authentication and implements [best practices for interacting with salt-api](https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices) as defined in salt.netapi modules specification:
 
@@ -14,7 +14,7 @@ clj-salt-api handles authentication and implements [best practices for interacti
 
 > The /events endpoint is specifically designed to handle long-running HTTP connections and it exposes Salt's event bus which includes job returns. Watching this endpoint first, then executing asynchronous Salt commands second, is the most lightweight and scalable way to use rest_cherrypy while still receiving job returns in real-time. But this requires clients that can properly handle the inherent asynchronicity of that workflow.
 
-clj-salt-api manages connection to /events endpoint and sends events to respective async requests. Response from every minion is delivered as separate value in core.async channel. clj-salt-api do all error handling and reconnections under the hood.
+clj-salt-api manages single HTTP connection to /events endpoint and sends salt events to respective async requests. Response from each minion is delivered as separate value in core.async channel. clj-salt-api does all error handling and reconnections under the hood.
 
 ## Usage
 

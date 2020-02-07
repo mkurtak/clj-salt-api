@@ -18,13 +18,14 @@
   (if (not (closeable? op)) :validate :park))
 
 (defn initial-op
-  [req client-atom]
-  (let [op {:request req
-            :retry-timeout 500
-            :subscription-count 0
-            :sse-retries 0
-            :client @client-atom}]
-    (assoc op :command (initial-command op))))
+  ([client-atom] (initial-op client-atom {}))
+  ([client-atom req]
+   (let [op {:request req
+             :retry-timeout 500
+             :subscription-count 0
+             :sse-retries 0
+             :client @client-atom}]
+     (assoc op :command (initial-command op)))))
 
 (defn- error-body
   [{:keys [:sse-retries]
@@ -45,7 +46,7 @@
 
 (defn- handle-request
   [{:keys [:sse-retries :retry-timeout] :as op}
-   [channel response]]
+   [_ {:keys [:type] :as response} channel]]
   (if (instance? Throwable response)
     (if (and
          (= :unauthorized (::s/response-category (ex-data response)))
@@ -55,12 +56,17 @@
              :body (req/create-login-request op)
              :sse-retries (inc sse-retries)) 
       (assoc op :command :error :body (error-body op response)))
-    (assoc op
-           :command :send
-           :connection (assoc response :chan channel)
-           :sse-retries 0
-           :retry-timeout (reset-retry-timeout retry-timeout sse-retries)
-           :body {:type :connected :correlation-id :all})))
+    (if (= :connect type)
+      (assoc op
+             :command :send
+             :connection (assoc response :chan channel)
+             :sse-retries 0
+             :retry-timeout (reset-retry-timeout retry-timeout sse-retries)
+             :body {:type :connected :correlation-id :all})
+      (assoc op
+             :command :error
+             :body (error-body op (ex-info (str "Invalid type " type " received")
+                                           {:response response}))))))
 
 (defn- invalid-subscribe-response
   [{:keys [:type :correlation-id] :as subscribe-command}]
@@ -87,14 +93,17 @@
            :body (invalid-subscribe-response subscribe-command))))
 
 (defn- handle-receive-event
-  [op {:keys [type] :as event}]
-  (if (instance? Throwable event)
-    (assoc op :command :send :body event)
-    (case type
-      :data (assoc op :command :send :body (:data event))
-      :retry (assoc op :command :receive :retry-timeout (:retry event))
-      :close (assoc op :command :receive)
-      nil (assoc op :command :close))))
+  [{:keys [:subscription-count] :as op}
+   {:keys [:type] :as event}]
+  (if (= 0 subscription-count)
+    (assoc op :command :receive)
+    (if (instance? Throwable event)
+      (assoc op :command :send :body event)
+      (case type
+        :data (assoc op :command :send :body (:data event))
+        :retry (assoc op :command :receive :retry-timeout (:retry event))
+        :close (assoc op :command :receive)
+        nil (assoc op :command :close)))))
 
 (defn- handle-receive
   [op [channel msg]]
@@ -119,7 +128,7 @@
 
 (defn- handle-park
   [{:keys [:subscription-count :retry-timeout :sse-retries] :as op}
-   {:keys [:type] :as response}]
+   [_ {:keys [:type] :as subscribe-command}]]
   (case type 
     :subscribe (assoc op
                       :subscription-count (inc subscription-count)
@@ -132,7 +141,7 @@
     :exit (assoc op :command :exit)
     (assoc op
            :command :send
-           :body (invalid-subscribe-response response))))
+           :body (invalid-subscribe-response subscribe-command))))
 
 (defn- handle-error
   [{:keys [sse-retries retry-timeout] :as op}]
@@ -146,7 +155,6 @@
   ([op] (handle-response op nil))
   ([{:keys [command] :as op} response]
    (try
-     (println "sse-handle " command)
      (case command
        :validate (req/handle-validate-token op)
        :login (handle-login op response)
@@ -193,29 +201,29 @@
   - ::salt.core/sse-keep-alive? - create sse connection even if there are no subscribers
   - ::salt.core/sse-max-retries - number errors could occur before go-loop is parked
   - ::salt.core/default-http-request - default request. will be merged with `req`"
-  ([client-atom req subs-chan] (sse client-atom req subs-chan (a/chan)))
-  ([client-atom req subs-chan resp-chan]
+  ([client-atom subs-chan] (sse client-atom subs-chan (a/chan) {}))
+  ([client-atom subs-chan resp-chan] (sse client-atom subs-chan resp-chan {}))
+  ([client-atom subs-chan resp-chan req]
    (a/go (loop [{:keys [command body retry-timeout]
                  {sse-chan :chan :as connection} :connection
                  {pool-opts ::s/default-sse-pool-opts} :client
                  :as op}
-                (initial-op req client-atom)]
-           (println "sse-loop " command body (:subscription-count op))
+                (initial-op client-atom req)]
            (when command
              (->> (case command
                     :validate nil
                     :login (a/<! (api/login body))
                     :swap-login (req/swap-login! client-atom op)
                     :request (let [ch (api/sse body pool-opts)]
-                               [ch (a/<! ch)])
+                               [:sse (a/<! ch) ch])
                     :receive (let [[result ch] (a/alts! [subs-chan sse-chan]
-                                                        :priority true)]
+                                                        :prideority true)]
                                (if (= ch subs-chan)
                                  [:subscription result]
                                  [:sse result]))
                     :send (do (a/>! resp-chan body) nil)
                     :close (api/close-sse connection)
-                    :park (a/<! subs-chan)
+                    :park [:subscription (a/<! subs-chan)]
                     :error (do
                              (when body (a/>! resp-chan body))
                              (a/<! (a/timeout retry-timeout)))

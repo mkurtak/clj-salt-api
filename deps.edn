@@ -4,7 +4,9 @@
         aleph                  {:mvn/version "0.4.7-alpha5"}}
  :aliases {:test {:extra-paths ["test/src"]
                   :extra-deps {expectations/clojure-test {:mvn/version "1.2.1"}}}
-           :runner {:extra-deps {lambdaisland/kaocha {:mvn/version "0.0-581"}}
+           :runner {:extra-deps
+                    {lambdaisland/kaocha {:mvn/version "0.0-581"}
+                     lambdaisland/kaocha-cloverage {:mvn/version "0.0-41"}}
                     :main-opts ["-m" "kaocha.runner"]}
            :kondo {:extra-deps {clj-kondo {:mvn/version "2020.01.27"}}
                    :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test"]}

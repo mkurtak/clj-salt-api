@@ -6,11 +6,15 @@
    [clojure.string :as str]
    [salt.core :as s]
    [salt.http :as http]
-   [salt.retry :as retry]
-   [salt.util :as u]))
+   [salt.retry :as retry]))
 
 (def ending-slash #"/$")
 (def starting-slash #"^/")
+
+(defn- throw-err
+  "Simple wrapper that throws exception if e is Throwable, otherwise just return e."
+  [e]
+  (if (instance? Throwable e) (throw e) e))
 
 (defn- add-url-path
   [url path]
@@ -78,7 +82,7 @@
   (http-request
    (create-login-request req)
    (a/chan 1 (comp
-              (map u/throw-err)
+              (map throw-err)
               (map http/parse-body)
               (map parse-return-vector))
            identity)))
@@ -97,7 +101,7 @@
   (http-request
    (create-request req)
    (a/chan 1 (comp
-              (map u/throw-err)
+              (map throw-err)
               (map http/parse-body))
            identity)))
 
@@ -122,7 +126,7 @@
    (retry/with-retry
      #(http/sse (create-sse-request req) pool-opts)
      (a/chan 1 (comp                    ;todo channel size?
-                (map u/throw-err)
+                (map throw-err)
                 (map http/parse-sse))
              identity))))
 

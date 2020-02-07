@@ -6,6 +6,13 @@
             [clojure.string :as str]
             [salt.client.request :as req]))
 
+(defn initial-op
+  [req correlation-id]
+  {:command :subscribe
+   :request req
+   :correlation-id correlation-id
+   :body {:type :subscribe :correlation-id correlation-id}})
+
 (defn- handle-connect
   [{expected-correlation-id :correlation-id :as op}
    {:keys [:type :correlation-id :error] :as response}]
@@ -24,8 +31,7 @@
     (assoc op
            :jid jid
            :minions (set minions)
-           :command :receive
-           :body response)))
+           :command :receive)))
 
 (defn- unsubscribe
   [{:keys [:correlation-id] :as op}]
@@ -56,15 +62,14 @@
 
 (defn- handle-receive-data
   [{:keys [:jid :minions] :as op}
-   {:keys [:tag]
-    {:keys [:return :success :id]} :data}]
-  (if (str/starts-with? tag (str "salt/job/" jid "/ret"))
+   {:keys [:tag :data]}]
+  (if (and tag data (str/starts-with? tag (str "salt/job/" jid "/ret")))
     (assoc op
            :command :send
-           :body {:minion id
-                  :return return
-                  :success success}
-           :minions (disj minions id))
+           :body {:minion (:id data)
+                  :return (:return data)
+                  :success (:success data)}
+           :minions (disj minions (:id data)))
     (assoc op :command :receive :body nil)))
 
 (defn- parse-print-job-return
@@ -101,9 +106,8 @@
 
 (defn handle-response
   ([op] (handle-response op nil))
-  ([{:keys [command] :as op} response]
+  ([{:keys [:command] :as op} response]
    (try
-     (println "async-handle" command response)
      (case command
        :subscribe (handle-with-command op :connect)
        :connect (handle-connect op response)
@@ -144,11 +148,7 @@
         data-chan (a/chan 100)]
     (a/go
       (loop [{:keys [:command :body] :as op}
-             {:command :subscribe
-              :request req
-              :correlation-id correlation-id
-              :body {:type :subscribe :correlation-id correlation-id}}]
-        (println "async-loop" command body)
+             (initial-op req correlation-id)]
         (when command
           (->> (case command
                  :subscribe (do (a/sub sse-pub :connection conn-chan)
