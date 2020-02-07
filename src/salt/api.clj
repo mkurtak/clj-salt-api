@@ -115,12 +115,12 @@
 
   Prepends master-url and appends '/events' to ring request url.
   Request is retried with default backoff and retriable?. See [[salt.retry/with-retry]] for more details.
-  If exception occurs its written to the channel and channel is closed.
+  If exception occurs, it is written to the channel and channel is closed.
   If SSE connection is closed, channel is closed.
   Request is aleph ring request with additonal keys
-  |:------------------------------|:----------------------------------------------------|
-  | `::salt.core/master-url`      | Base url of salt-master. Its prepended to ring :url |
-  | `::salt.core/login-response`  | Response from [[salt.api/login]]                      |"
+  |:------------------------------|:----------------------------------------------|
+  | `::salt.core/master-url`      | Base url of salt-master. It is preepended :url
+  | `::salt.core/login-response`  | Response from [[salt.api/login]]"
   ([req] (sse req {}))
   ([req pool-opts]
    (retry/with-retry

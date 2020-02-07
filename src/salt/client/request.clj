@@ -79,7 +79,7 @@
 
   Channel is closed after response is delivered.
 
-  Request will be merged with client default-http-request. See [[salt.client/client]] for more details. "
+  Request will be merged with client default-http-request. See [[salt.client/client]] for more details."
   ([client-atom req] (request client-atom req (a/chan)))
   ([client-atom req resp-chan]
    (a/go (loop [{:keys [command body] :as op}

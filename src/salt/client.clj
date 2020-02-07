@@ -48,7 +48,7 @@
   `::salt.core/default-sse-pool-opts`- optional, default connection pool opts,
                                        see `aleph` documentation for more details.
   `::salt.core/sse-keep-alive?`      - optional, if true /events SSE connection
-                                       will be allways kept open, 
+                                       will be always kept open, 
                                        if false /events SSE connection will be
                                        kept open only if there are active async
                                        requests, defaults to true

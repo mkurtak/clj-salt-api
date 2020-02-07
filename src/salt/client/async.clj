@@ -141,7 +141,7 @@
 
   Channel is closed after all minions return.
   Request will be merged with client default-http-request. 
-  See [[salt.client/client]] for more details. "
+  See [[salt.client/client]] for more details."
   [client-atom req subs-chan sse-pub resp-chan]
   (let [correlation-id (java.util.UUID/randomUUID)
         conn-chan (a/chan)
