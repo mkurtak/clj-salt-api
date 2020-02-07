@@ -16,4 +16,6 @@
                       :main-opts ["-m" "depot.outdated.main"]}
            :install {:extra-deps {deps-deploy {:mvn/version "0.0.9"}}
                      :main-opts ["-m" "deps-deploy.deps-deploy" "install"
-                                 "target/clj-salt-api.jar"]}}}
+                                 "target/clj-salt-api.jar"]}
+           :deploy {:extra-deps {deps-deploy {:mvn/version "0.0.9"}}
+                    :main-opts ["-m" "deps-deploy.deps-deploy" "deploy"]}}}

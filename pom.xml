@@ -6,10 +6,9 @@
   <version>2020.02.04-SNAPSHOT</version>
   <name>clj-salt-api</name>
   <scm>
-    <connection>scm:git:git@github.com/mkurtak/clj-salt-api</connection>
-    <developerConnection>scm:git:git@github.com/mkurtak/clj-salt-api</developerConnection>
+    <connection>scm:git:https://github.com/mkurtak/clj-salt-api</connection>
+    <developerConnection>scm:git:https://github.com/mkurtak/clj-salt-api</developerConnection>
     <url>https://github.com/mkurtak/clj-salt-api</url>
-    <tag>HEAD</tag>
   </scm>
   <dependencies>
     <dependency>
