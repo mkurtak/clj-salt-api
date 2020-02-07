@@ -45,6 +45,8 @@
                                        all available values
   `::salt.core/default-http-request` - optional, default ring request to be
                                        merged with all requests
+  `::salt.core/default-sse-pool-opts`- optional, default connection pool opts,
+                                       see `aleph` documentation for more details.
   `::salt.core/sse-keep-alive?`      - optional, if true /events SSE connection
                                        will be allways kept open, 
                                        if false /events SSE connection will be
