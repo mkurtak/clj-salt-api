@@ -173,8 +173,8 @@
   Server-sent events is a stream of text lines separated by empty lines.
   
   Returns new channel delivering server-sent events with following types
-  |Type        | Attributes | Description
-  |:-----------|:-----------|
+  | Type       | Attributes | Description
+  | -----------| -----------|
   | `:connect` | :stream    | Connection is established. Use :stream to close SSE. 
   | `:data`    | :id :data  | One SSE event. When event contains multiple data attributes, they are concatenated with newline character.
   | `:retry`   | :retry     | SSE indicates to set retry-timeout.

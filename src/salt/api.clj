@@ -72,12 +72,14 @@
   Prepends master-url and appends '/login' to ring request url.    
   Request is retried with default backoff and retriable?. See [[salt.retry/with-retry]] for more details.
   Exception and parsed body is sent with channel and channel is closed afterwards.
-  Request is aleph ring request with additonal keys
-  |:-------------------------|:----------------------------------------------------|
-  | `::salt.core/master-url` | Base url of salt-master. Its prepended to ring :url |
-  | `::salt.core/username`   | Username to be used in salt authetincation if any   |
-  | `::salt.core/password`   | Password to be used in salt authetincation if any   |
-  | `::salt.core/eauth`      | Eauth system to be used in salt authentication. Please refer saltstack documentation for available values |"
+  Request is aleph ring request with additonal keys:
+  
+  | Key                      | Description |
+  | -------------------------| ------------|
+  | `::salt.core/master-url` | Base url of salt-master. Its prepended to ring :url
+  | `::salt.core/username`   | Username to be used in salt authetincation if any
+  | `::salt.core/password`   | Password to be used in salt authetincation if any
+  | `::salt.core/eauth`      | Eauth system to be used in salt authentication. Please refer saltstack documentation for available values"
   [req]
   (http-request
    (create-login-request req)
@@ -93,9 +95,11 @@
   Prepends master-url to ring request url.    
   Request is retried with default backoff and retriable?. See [[salt.retry/with-retry]] for more details.
   Exception and parsed body is sent with channel and channel is closed afterwards.
-  Request is aleph ring request with additonal keys
-  |:------------------------------|:----------------------------------------------------|
-  | `::salt.core/master-url`      | Base url of salt-master. Its prepended to ring :url |
+  Request is aleph ring request with additonal keys:
+  
+  | Key                           | Description |
+  | ------------------------------| ------------|
+  | `::salt.core/master-url`      | Base url of salt-master. Its prepended to ring :url
   | `::salt.core/login-response`  | Response from [[salt.api/login]]|"
   [req]
   (http-request
@@ -118,7 +122,9 @@
   If exception occurs, it is written to the channel and channel is closed.
   If SSE connection is closed, channel is closed.
   Request is aleph ring request with additonal keys
-  |:------------------------------|:----------------------------------------------|
+  
+  | Key                           | Description |
+  | ------------------------------| ------------|
   | `::salt.core/master-url`      | Base url of salt-master. It is preepended :url
   | `::salt.core/login-response`  | Response from [[salt.api/login]]"
   ([req] (sse req {}))

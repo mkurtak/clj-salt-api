@@ -34,30 +34,30 @@
 (defn client
   "Given a config map, create a client for saltstack api. Supported keys:
   
-  `::salt.core/master-url`           - required, saltstack master base url
-  `::salt.core/username`             - optional, username to be used in salt auth
-                                       system
-  `::salt.core/password`             - optional, password to be used in salt auth
-                                       system
-  `::salt.core/eauth`                - optional, Eauth system to be used in salt
-                                       auth system. defaults to 'pam'.
-                                       Please refer saltstack documentation for
-                                       all available values
-  `::salt.core/default-http-request` - optional, default ring request to be
-                                       merged with all requests
-  `::salt.core/default-sse-pool-opts`- optional, default connection pool opts,
-                                       see `aleph` documentation for more details.
-  `::salt.core/sse-keep-alive?`      - optional, if true /events SSE connection
-                                       will be always kept open, 
-                                       if false /events SSE connection will be
-                                       kept open only if there are active async
-                                       requests, defaults to true
-  `::salt.core/max-sse-retries`      - optional, maximum number of errors before
-                                       /events SSE connection is retried. 
-                                       If number of errors exceeds this value,
-                                       all async request receive an error and 
-                                       SSE behaves as sse-keep-alive? false, 
-                                       defaults to 3"
+  - `::salt.core/master-url`           - required, saltstack master base url
+  - `::salt.core/username`             - optional, username to be used in salt auth
+                                         system
+  - `::salt.core/password`             - optional, password to be used in salt auth
+                                         system
+  - `::salt.core/eauth`                - optional, Eauth system to be used in salt
+                                         auth system. defaults to 'pam'.
+                                         Please refer saltstack documentation for
+                                         all available values
+  - `::salt.core/default-http-request` - optional, default ring request to be
+                                         merged with all requests
+  - `::salt.core/default-sse-pool-opts`- optional, default connection pool opts,
+                                         see `aleph` documentation for more details.
+  - `::salt.core/sse-keep-alive?`      - optional, if true /events SSE connection
+                                         will be always kept open, 
+                                         if false /events SSE connection will be
+                                         kept open only if there are active async
+                                         requests, defaults to true
+  - `::salt.core/max-sse-retries`      - optional, maximum number of errors before
+                                         /events SSE connection is retried. 
+                                         If number of errors exceeds this value,
+                                         all async request receive an error and 
+                                         SSE behaves as sse-keep-alive? false, 
+                                         defaults to 3"
   [opts]
   (client-start (client-not-started opts)))
 

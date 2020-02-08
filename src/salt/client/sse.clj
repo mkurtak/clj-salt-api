@@ -186,13 +186,15 @@
   Details:
   
   Takes values from `subs-chan`
-  |:-------------------|:-----------|
+  | Key                | Description |
+  | -------------------| ------------|
   | :type :subscribe   | Subscribe with correlation id
   | :type :unsubscribe | Unsubscribe
   | :type :exit        | Quit go-loop
   
   Channel will deliver:
-  |:-----------------|:-----------|
+  | Response         | Description |
+  | -----------------| ------------|
   | Exception        | Error occurs and SSE could not be delivered (e.g. connection error and reconnect fails). Client should return error.
   | `:type :data`    | SSE event. Body is parsed from json.
   | `:type :connect` | When subscription is made (with :correlation-id set) or on reconnect with :correlation-id :all or subscription error occurs (:error is set)
