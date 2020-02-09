@@ -28,5 +28,5 @@ jobs:
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies- {{ checksum "deps.edn" }}
+          key: v1-dependencies-{{ checksum "deps.edn" }}
     
