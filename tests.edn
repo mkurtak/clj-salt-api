@@ -2,4 +2,5 @@
 {:plugins #profile {:default []
                     :ci      [:kaocha.plugin/cloverage
                               :kaocha.plugin/junit-xml]}
- :kaocha.plugin.junit-xml/target-file "target/test-results/kaocha/results.xml"}
+ :kaocha.plugin.junit-xml/target-file "target/test-results/kaocha/results.xml"
+ :cloverage/opts {:codecov? true}}

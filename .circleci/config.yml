@@ -1,4 +1,6 @@
 version: 2.1
+orbs:
+  codecov: codecov/codecov@1.0.5
 jobs:
   build:
     docker:
@@ -25,6 +27,8 @@ jobs:
           destination: release
       - store_test_results:
           path: target/test-results
+      - codecov/upload:
+          file: target/coverage/codecov.json
       - save_cache:
           paths:
             - ~/.m2
