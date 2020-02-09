@@ -24,7 +24,7 @@ jobs:
           command: clojure -A:jar
       - store_artifacts:
           path: target/clj-salt-api.jar
-          destination: release
+          destination: clj-salt-api.jar
       - store_test_results:
           path: target/test-results
       - codecov/upload:
