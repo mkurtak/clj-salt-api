@@ -1,6 +1,6 @@
 *.jar
 *.class
-.clj-kondo/
+.clj-kondo/.cache
 /lib/
 /classes/
 /target/

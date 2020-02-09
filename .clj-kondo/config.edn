@@ -1,0 +1,3 @@
+{:linters
+ {:unresolved-symbol {:exclude [(salt.test-utils/test-flow-> [r])]}
+  :invalid-arity {:skip-args [salt.test-utils/test-flow->]}}}
