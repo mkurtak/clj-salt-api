@@ -2,14 +2,15 @@
  :deps {org.clojure/core.async {:mvn/version "0.7.559"}
         cheshire               {:mvn/version "5.9.0"}
         aleph                  {:mvn/version "0.4.7-alpha5"}}
- :aliases {:test {:extra-paths ["test/src"]
-                  :extra-deps {expectations/clojure-test {:mvn/version "1.2.1"}}}
+ :aliases {:test {:extra-paths ["test/src"]}
            :runner {:extra-deps
                     {lambdaisland/kaocha {:mvn/version "0.0-581"}
-                     lambdaisland/kaocha-cloverage {:mvn/version "0.0-41"}}
+                     lambdaisland/kaocha-cloverage {:mvn/version "0.0-41"}
+                     lambdaisland/kaocha-junit-xml {:mvn/version "0.0-70"}}
                     :main-opts ["-m" "kaocha.runner"]}
            :kondo {:extra-deps {clj-kondo {:mvn/version "2020.01.27"}}
-                   :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test"]}
+                   :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test/src"
+                               "--config" ".clj-kondo/config.edn"]}
            :jar {:extra-deps {seancorfield/depstar {:mvn/version "0.5.2"}}
                  :main-opts ["-m" "hf.depstar.jar" "target/clj-salt-api.jar"]}
            :outdated {:extra-deps {olical/depot {:mvn/version "1.8.4"}}
