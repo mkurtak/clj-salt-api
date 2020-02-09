@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/mkurtak/clj-salt-api.svg?style=shield)](https://circleci.com/gh/mkurtak/clj-salt-api)
+[![codecov](https://codecov.io/gh/mkurtak/clj-salt-api/branch/master/graph/badge.svg)](https://codecov.io/gh/mkurtak/clj-salt-api)
 # clj-salt-api
 
 [salt-api](http://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#module-salt.netapi.rest_cherrypy.app) client library for Clojure.
