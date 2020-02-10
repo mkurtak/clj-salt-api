@@ -4,8 +4,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [salt.api :as api]
             [salt.core :as s]
-            [salt.test-utils :as u]
-            [clojure.string :as str]))
+            [salt.test-utils :as u]))
 
 (deftest login-test
   (testing "login-request custom params"
