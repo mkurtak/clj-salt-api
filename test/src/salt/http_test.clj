@@ -5,7 +5,7 @@
    [clojure.test :refer [deftest is testing]]
    [salt.http :as http]))
 
-(deftest http-response-test
+(deftest parse-body-test
   (testing "parse-body"
     (is (= ["Error body"]
            (http/parse-body {:status 404
@@ -17,11 +17,48 @@
                                    :body "{bad-body"
                                    :headers {"content-type" "application/json"}
                                    :header :this-is-header})))
+    (is (thrown? Exception
+                 (http/parse-body {:status 200
+                                   :body "<test>T</test>"
+                                   :headers {"content-type" "application/xml"}
+                                   :header :this-is-header})))
+    (is (thrown? Exception
+                 (http/parse-body {:status 200
+                                   :body "{\"id\": 25}"
+                                   :header :this-is-header})))
     (is (= {:id 25}
            (http/parse-body {:status 200
                              :header "This is header"
                              :headers {"content-type" "application/json"}
                              :body "{\"id\": 25}"})))))
+
+(deftest parse-sse-test
+  (testing "parse-sse"
+    (is (= {:type :data :data {:id 25}}
+           (http/parse-sse {:type :data
+                            :data "{\"id\": 25}"})))
+    (is (= {:type :retry :retry 25}
+           (http/parse-sse {:type :retry :retry 25})))
+    (is (thrown? Exception
+                 (http/parse-sse {:type :data :data "{\"id\": 25"})))))
+
+(deftest response->channel-response
+  (testing "response->channel-response"
+    (is (= {:status 200
+            :headers {"content-type" "application/json"}
+            :body "{\"id\": 25}"}
+           (http/response->channel-response {:status 200
+                                             :headers {"content-type"
+                                                       "application/json"}
+                                             :body "{\"id\": 25}"})))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (http/response->channel-response {:status 401})))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (http/response->channel-response {:status 500})))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (http/response->channel-response {:status 404})))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (http/response->channel-response {})))))
 
 (deftest sse-test
   (testing "sse-buffer->events"

@@ -29,7 +29,7 @@
   [body]
   (json/parse-string (bs/to-string body) true))
 
-(defn- response->channel-response
+(defn response->channel-response
   [resp]
   (let [category (status-code->category resp)]
     (if (= category :ok)

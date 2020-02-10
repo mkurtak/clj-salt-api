@@ -18,10 +18,10 @@
 
 (defn- add-url-path
   [url path]
-  (str/join "/" [(str/replace url ending-slash "")
-                 (if (nil? path)
-                   nil
-                   (str/replace path starting-slash ""))]))
+  (if (str/blank? path)
+    url
+    (str/join "/" [(str/replace url ending-slash "")
+                   (str/replace path starting-slash "")])))
 
 (defn create-login-request
   [{:keys [::s/master-url ::s/username ::s/password ::s/eauth]
@@ -54,7 +54,8 @@
   (merge opts
          {:url (add-url-path master-url "/events")
           :method :get
-          :headers (merge headers {"X-Auth-token" token})}))
+          :headers (merge headers {"Accept" "application/json"
+                                   "X-Auth-token" token})}))
 
 (defn- parse-return-vector
   [{[result] :return :as body}]
