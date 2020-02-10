@@ -152,22 +152,21 @@
            :retry-timeout (* retries retry-timeout))))
 
 (defn handle-response
-  ([op] (handle-response op nil))
-  ([{:keys [command] :as op} response]
-   (try
-     (case command
-       :validate (req/handle-validate-token op)
-       :login (handle-login op response)
-       :swap-login (req/handle-swap-login op)
-       :request (handle-request op response)
-       :receive (handle-receive op response)
-       :send (handle-send op)
-       :close (handle-close op)
-       :park (handle-park op response)
-       :error (handle-error op)
-       :exit nil)
-     (catch Throwable e
-       (assoc op :command :error :body (error-body op e))))))
+  [{:keys [command] :as op} response]
+  (try
+    (case command
+      :validate (req/handle-validate-token op)
+      :login (handle-login op response)
+      :swap-login (req/handle-swap-login op)
+      :request (handle-request op response)
+      :receive (handle-receive op response)
+      :send (handle-send op)
+      :close (handle-close op)
+      :park (handle-park op response)
+      :error (handle-error op)
+      :exit nil)
+    (catch Throwable e
+      (assoc op :command :error :body (error-body op e)))))
 
 (defn sse
   "Invoke [[salt.api/sse]] request and returns `resp-chan` which deliver SSE events, subscription responses and error.

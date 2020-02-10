@@ -105,22 +105,21 @@
   (assoc op :command command))
 
 (defn handle-response
-  ([op] (handle-response op nil))
-  ([{:keys [:command] :as op} response]
-   (try
-     (case command
-       :subscribe (handle-with-command op :connect)
-       :connect (handle-connect op response)
-       :request (handle-request op response)
-       :receive (handle-receive op response)
-       :send (handle-send op)
-       :reconnect (handle-reconnect op response)
-       :connect-error (handle-with-command op :exit)
-       :error (unsubscribe op)
-       :unsubscribe (handle-with-command op :exit)
-       :exit nil)
-     (catch Throwable e
-       (assoc op :command :error :body e)))))
+  [{:keys [:command] :as op} response]
+  (try
+    (case command
+      :subscribe (handle-with-command op :connect)
+      :connect (handle-connect op response)
+      :request (handle-request op response)
+      :receive (handle-receive op response)
+      :send (handle-send op)
+      :reconnect (handle-reconnect op response)
+      :connect-error (handle-with-command op :exit)
+      :error (unsubscribe op)
+      :unsubscribe (handle-with-command op :exit)
+      :exit nil)
+    (catch Throwable e
+      (assoc op :command :error :body e))))
 
 (defn- to-vec
   [x]

@@ -57,17 +57,16 @@
   {:command :validate :request req :client @client-atom})
 
 (defn handle-response
-  ([op] (handle-response op nil))
-  ([{:keys [command] :as op} response]
-   (try (case command
-          :validate (handle-validate-token op)
-          :login (handle-login op response)
-          :swap-login (handle-swap-login op)
-          :request (handle-request op response)
-          :error nil
-          :response nil)
-        (catch Throwable e
-          (assoc op :command :error :body e)))))
+  [{:keys [command] :as op} response]
+  (try (case command
+         :validate (handle-validate-token op)
+         :login (handle-login op response)
+         :swap-login (handle-swap-login op)
+         :request (handle-request op response)
+         :error nil
+         :response nil)
+       (catch Throwable e
+         (assoc op :command :error :body e))))
 
 (defn request
   "Invoke [[salt.api/request]] request and returns channel which deliver the response.

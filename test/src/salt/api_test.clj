@@ -17,15 +17,16 @@
                    (api/create-login-request {::s/master-url "http://salt-master"
                                               ::s/username "saltapi"
                                               ::s/password "saltapi"}))))
-  (is (u/submap? {:url "http://salt-master/login"
-                  :method :post
-                  :headers  {"Accept" "application/json"}
-                  :request-timeout 1e4
-                  :form-params {:eauth "pam"
-                                :username "saltapi"
-                                :password "saltapi"}}
-                 (api/create-login-request {::s/master-url "http://salt-master"
-                                            ::s/username "saltapi"
-                                            ::s/password "saltapi"
-                                            :request-timeout 1e4
-                                            :headers {"test-header" "val"}}))))
+  (testing "login-request custom params"
+    (is (u/submap? {:url "http://salt-master/login"
+                    :method :post
+                    :headers  {"Accept" "application/json"}
+                    :request-timeout 1e4
+                    :form-params {:eauth "pam"
+                                  :username "saltapi"
+                                  :password "saltapi"}}
+                   (api/create-login-request {::s/master-url "http://salt-master"
+                                              ::s/username "saltapi"
+                                              ::s/password "saltapi"
+                                              :request-timeout 1e4
+                                              :headers {"test-header" "val"}})))))
