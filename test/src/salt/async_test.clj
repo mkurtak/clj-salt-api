@@ -19,11 +19,25 @@
   [jid minions]
   {:return [{:jid jid :minions minions}]})
 
+(defn- master-client-request-resp
+  [jid]
+  {:return [{:jid jid :tag (str "salt/run/" jid)}]})
+
+(defn- empty-request-resp
+  []
+  {:return [{}]})
+
 (defn- minion-return-resp
   [jid minion]
   [:data
-   {:tag (str "salt/job/" jid "/ret")
+   {:tag (str "salt/job/" jid "/ret/" minion)
     :data {:return "Done!" :success true :id minion}}])
+
+(defn- master-return-resp
+  [jid]
+  [:data
+   {:tag (str "salt/run/" jid "/ret")
+    :data {:return "Done!" :success true}}])
 
 (defn- reconnect-resp
   []
@@ -63,6 +77,19 @@
                                        (minion-return-resp "2" "m2"))
        (is (= :send (:command r))) (async/handle-response
                                     (minion-return-resp "1" "m2"))
+       (is (= :unsubscribe (:command r))) (async/handle-response nil)
+       (is (= :exit (:command r))) (async/handle-response nil)))
+    (testing "master client"
+      (u/test-flow->
+       (initial-op {:form-params
+                    {:url "test" :client "runner_async"}} correlation-id) r
+       (is (= :connect (:command r))) (async/handle-response nil)
+       (is (= :request (:command r))) (async/handle-response
+                                       (connected-resp :all))
+       (is (= :receive (:command r))) (async/handle-response
+                                       (master-client-request-resp "1"))
+       (is (= :send (:command r))) (async/handle-response
+                                    (master-return-resp "1"))
        (is (= :unsubscribe (:command r))) (async/handle-response nil)
        (is (= :exit (:command r))) (async/handle-response nil)))
     (testing "data subscription after connect"
@@ -112,11 +139,20 @@
        (initial-op correlation-id) r
        (is (= :connect (:command r))) (async/handle-response nil)
        (is (= :request (:command r))) (async/handle-response (connected-resp :all))
-       (is (= :error (:command r))) (async/handle-response
-                                     (ex-info "Error!" {}))
+       (is (= :error (:command r))) (async/handle-response (ex-info "Error!" {}))
        (is (= :unsubscribe (:command r))) (async/handle-response nil)
        (is (= :exit (:command r))) (async/handle-response nil)
-       )))
+       ))
+    (testing "invalid minions request"
+      (u/test-flow->
+       (initial-op correlation-id) r
+       (is (= :connect (:command r))) (async/handle-response nil)
+       (is (= :request (:command r))) (async/handle-response (connected-resp :all))
+       (is (= :error (:command r))) (async/handle-response (empty-request-resp))
+       (is (= :unsubscribe (:command r))) (async/handle-response nil)
+       (is (= :exit (:command r))) (async/handle-response nil)
+       ))
+    )
   )
 
 (deftest async-reconnect-test

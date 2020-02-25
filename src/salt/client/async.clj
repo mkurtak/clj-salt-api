@@ -6,11 +6,15 @@
             [clojure.string :as str]
             [salt.client.request :as req]))
 
+(def master-clients
+  #{"runner_async" "wheel_async"})
+
 (defn initial-op
   [req correlation-id]
   {:command :subscribe
    :request req
    :correlation-id correlation-id
+   :master-client? (contains? master-clients (get-in req [:form-params :client]))
    :body {:type :subscribe :correlation-id correlation-id}})
 
 (defn- handle-connect
@@ -24,14 +28,21 @@
       (assoc op :command :connect))
     (assoc op :command :error :body response)))
 
+(defn- parse-request
+  [{:keys [:master-client?] :as op} {:keys [:jid :minions :tag]}]
+  (if master-client?
+    (assoc op :jid jid :job-tag (str tag "/ret") :command :receive)
+    (assoc op :jid jid :job-tag (str "salt/job/" jid "/ret")
+           :minions (set minions) :command :receive)))
+
 (defn- handle-request
-  [op {[{:keys [:jid :minions]}] :return :as response}]
+  [op {[{:keys [:jid] :as return}] :return :as response}]
   (if (instance? Throwable response)
     (assoc op :command :error :body response)
-    (assoc op
-           :jid jid
-           :minions (set minions)
-           :command :receive)))
+    (if jid
+      (parse-request op return)
+      (assoc op :command :error :body
+             (ex-info "No job returned from salt" {:response response})))))
 
 (defn- unsubscribe
   [{:keys [:correlation-id] :as op}]
@@ -40,8 +51,8 @@
          :body {:type :unsubscribe :correlation-id correlation-id}))
 
 (defn- handle-send
-  [{:keys [:minions] :as op}]
-  (if (empty? minions)
+  [{:keys [:master-client? :minions] :as op}]
+  (if (or master-client? (empty? minions))
     (unsubscribe op)
     (assoc op :command :receive :body nil)))
 
@@ -60,19 +71,32 @@
       (assoc op :command :reconnect :body (create-reconnect-request op))
       (assoc op :command :receive))))
 
+(defn- handle-receive-data-from-minion
+  [{:keys [:minions] :as op} data]
+  (assoc op
+         :command :send
+         :body {:minion (:id data)
+                :return (:return data)
+                :success (:success data)}
+         :minions (disj minions (:id data))))
+
+(defn- handle-receive-data-from-master
+  [op data]
+  (assoc op
+         :command :send
+         :body {:return (:return data)
+                :success (:success data)}))
+
 (defn- handle-receive-data
-  [{:keys [:jid :minions] :as op}
+  [{:keys [:master-client? :job-tag] :as op}
    {:keys [:tag :data]}]
-  (if (and tag data (str/starts-with? tag (str "salt/job/" jid "/ret")))
-    (assoc op
-           :command :send
-           :body {:minion (:id data)
-                  :return (:return data)
-                  :success (:success data)}
-           :minions (disj minions (:id data)))
+  (if (and tag data (str/starts-with? tag job-tag))
+    (if master-client?
+      (handle-receive-data-from-master op data)
+      (handle-receive-data-from-minion op data))
     (assoc op :command :receive :body nil)))
 
-(defn- parse-print-job-return
+(defn- parse-print-job-minions-returns
   [return jid minions]
   (->> (:Result (get return (keyword (str jid))))
        (map #(vector (name (first %)) (second %)))
@@ -82,17 +106,37 @@
                     :return (:return (second %))
                     :success (:success (second %))))))
 
-(defn- handle-reconnect
+(defn- parse-print-job-minion-result
   [{:keys [:jid :minions] :as op}
-   {[return] :return :as response}]
+   {[return] :return}]
+  (let [returns (parse-print-job-minions-returns return jid minions)
+        result-minions (set (map :minion returns))
+        remaining-minions (st/difference minions result-minions)]
+    (if (seq result-minions)
+      (assoc op :command :send :body returns :minions remaining-minions)
+      (assoc op :command :receive :body nil))))
+
+(defn- parse-print-job-master-return
+  [return jid]
+  (let  [result (-> (get return (keyword (str jid)))
+                    :Result
+                    vals
+                    first
+                    :return)]
+    {:return (:return result)
+     :success (:success result)}))
+
+(defn- parse-print-job-master-result
+  [{:keys [:jid] :as op} {[return] :return}]
+  (assoc op :command :send :body (parse-print-job-master-return return jid)))
+
+(defn- handle-reconnect
+  [{:keys [:master-client?] :as op} response]
   (if (instance? Throwable response)
     (assoc op :command :error :body response)
-    (let [returns (parse-print-job-return return jid minions)
-          result-minions (set (map :minion returns))
-          remaining-minions (st/difference minions result-minions)]
-      (if (seq result-minions)
-        (assoc op :command :send :body returns :minions remaining-minions)
-        (assoc op :command :receive :body nil)))))
+    (if master-client?
+      (parse-print-job-master-result op response)
+      (parse-print-job-minion-result op response))))
 
 (defn- handle-receive
   [op [channel msg]]
