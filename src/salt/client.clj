@@ -9,6 +9,8 @@
             [salt.core :as s]))
 
 (defn- sse-topic
+  "Messages of type `:connected` or errors are delivered to topic `:connection`
+   all other messages are delivered to topic `:data`"
   [msg]
   (if (or (instance? Throwable msg) (= :connected (:type msg))) :connection :data))
 
@@ -116,31 +118,3 @@
     (a/close! (:sse-resp-chan client))
     (a/close! (:sse-subs-chan client))
     (revoke-session client-atom)))
-
-(comment
-  (def salt-client (salt.client/client {::s/master-url "http://192.168.50.10:8000"
-                                        ::s/username "saltapi"
-                                        ::s/password "saltapi"
-                                        ::s/max-sse-retries 3
-                                        ::s/sse-keep-alive? true}))
-
-  (clojure.core.async/<!! (request salt-client
-                                   {:form-params {:client "local"
-                                                  :tgt "*"
-                                                  :fun "test.ping"}}))
-
-  (do
-    (def resp-chan (request-async salt-client
-                                  {:form-params {:client "local_async"
-                                                 :tgt "*"
-                                                 :fun "test.ping"}}))
-
-    (def resp-chan2 (request-async salt-client
-                                   {:form-params {:client "local_async"
-                                                  :tgt "*"
-                                                  :fun "test.version"}})))
-  (clojure.core.async/<!! resp-chan)
-  (clojure.core.async/<!! resp-chan2)
-
-  (close salt-client)
-  )
