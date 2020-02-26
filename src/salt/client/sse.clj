@@ -95,15 +95,16 @@
 (defn- handle-receive-event
   [{:keys [:subscription-count] :as op}
    {:keys [:type] :as event}]
-  (if (= 0 subscription-count)
-    (assoc op :command :receive)
-    (if (instance? Throwable event)
-      (assoc op :command :send :body event)
-      (case type
-        :data (assoc op :command :send :body (:data event))
-        :retry (assoc op :command :receive :retry-timeout (:retry event))
-        :close (assoc op :command :receive)
-        nil (assoc op :command :close)))))
+  (if (instance? Throwable event)
+    (assoc op :command :send :body event)
+    (if (nil? type)
+      (assoc op :command :close)
+      (if (= 0 subscription-count)
+        (assoc op :command :receive)
+        (case type
+          :data (assoc op :command :send :body (:data event))
+          :retry (assoc op :command :receive :retry-timeout (:retry event))
+          :close (assoc op :command :receive))))))
 
 (defn- handle-receive
   [op [channel msg]]
