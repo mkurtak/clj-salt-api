@@ -46,11 +46,11 @@
 (defn- print-job-resp
   [jid minions]
   {:return
-   [{(keyword jid)
-     {:Result
-      (into {}
-            (map #(vector (keyword %) {:return "Done!" :success true})
-                 minions))}}]})
+   {(keyword jid)
+    {:Result
+     (into {}
+           (map #(vector (keyword %) {:return "Done!" :success true})
+                minions))}}})
 
 (defn- send-data?
   [r]
