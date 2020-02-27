@@ -58,7 +58,7 @@
 
 (defn- create-reconnect-request
   [{:keys [:jid]}]
-  {:form-params {:client "runner"
+  {:form-params {:client "runner_async"
                  :fun "jobs.print_job"
                  :jid jid}})
 
@@ -107,8 +107,7 @@
                     :success (:success (second %))))))
 
 (defn- parse-print-job-minion-result
-  [{:keys [:jid :minions] :as op}
-   {[return] :return}]
+  [{:keys [:jid :minions] :as op} return]
   (let [returns (parse-print-job-minions-returns return jid minions)
         result-minions (set (map :minion returns))
         remaining-minions (st/difference minions result-minions)]
@@ -127,16 +126,17 @@
      :success (:success result)}))
 
 (defn- parse-print-job-master-result
-  [{:keys [:jid] :as op} {[return] :return}]
+  [{:keys [:jid] :as op} return]
   (assoc op :command :send :body (parse-print-job-master-return return jid)))
 
 (defn- handle-reconnect
-  [{:keys [:master-client?] :as op} response]
-  (if (instance? Throwable response)
+  [{:keys [:master-client?] :as op} {:keys [:return :success] :as response}]
+  (if (or (instance? Throwable response)
+          (false? success))
     (assoc op :command :error :body response)
     (if master-client?
-      (parse-print-job-master-result op response)
-      (parse-print-job-minion-result op response))))
+      (parse-print-job-master-result op return)
+      (parse-print-job-minion-result op return))))
 
 (defn- handle-receive
   [op [channel msg]]
@@ -207,7 +207,8 @@
                               [:data result]))
                  :send (doseq [b (to-vec body)]
                          (a/>! resp-chan b))
-                 :reconnect (a/<! (req/request client-atom body))
+                 :reconnect (a/<! (request-async client-atom body subs-chan sse-pub
+                                                 (a/chan)))
                  :connect-error (a/>! resp-chan body)
                  :error (a/>! resp-chan body)
                  :unsubscribe (a/>! subs-chan body)
