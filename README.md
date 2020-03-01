@@ -2,7 +2,7 @@
 [![codecov](https://codecov.io/gh/mkurtak/clj-salt-api/branch/master/graph/badge.svg)](https://codecov.io/gh/mkurtak/clj-salt-api)
 # clj-salt-api
 
-[salt-api](http://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#module-salt.netapi.rest_cherrypy.app) client library for Clojure.
+Saltstack [salt-api](http://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#module-salt.netapi.rest_cherrypy.app) client library for Clojure.
 
 ## Rationale
 
@@ -33,19 +33,40 @@ clj-salt-api manages single HTTP connection to /events endpoint and sends salt e
                           ::s/sse-keep-alive? true}))
 
 ;; Execute async request and collect responses from all minions in one vector
-(a/<!! (a/into [] (salt/request-async client {:form-params {:client "local_async"
+(def minions-chan (salt/request-async client {:form-params {:client "local_async"
                                                             :tgt "*"
                                                             :fun "pkg.version"
-                                                            :arg "vim"}})))
+                                                            :arg ["vim"]}}))
+;; Take minion response
+(a/<!! minions-chan)
 
-;; Execute sync request
-(a/<!! (salt/request client {:form-params {:client "local"
+;; Take another minion response
+(a/<!! minions-chan)
+
+;; Take until minions-chan is closed
+;; ...
+
+;; Execute sync request with custom timeouts
+(a/<!! (salt/request client {:request-timeout 5000
+                             :form-params {:client "local"
                                            :tgt "*"
                                            :fun "test.ping"}}))
 
 ;; Close client
 (salt/close client)
 ```
+### Examples
+
+See [examples](examples) directory for more examples.
+
+### Supported clients
+
+- `request` function accepts `local, local_batch, runner` and `wheel` clients
+- `request-async` function accepts `local_async, runner_async` and `wheel_async` clients
+
+### Http client
+
+clj-salt-api relies on [aleph](https://github.com/ztellman/aleph). Both `request` and `request-async` accept plain ring request maps and use `aleph` to execute requests. Please refer to `aleph` documenation for all http related configuration (timeouts, custom http headers, proxy configuration, client certificates, ...)
 
 ## Copyright and License
 
