@@ -12,3 +12,4 @@
 .nrepl-port
 .dir-locals.el
 .cpcache/
+.DS_Store

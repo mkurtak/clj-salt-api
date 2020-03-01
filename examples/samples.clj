@@ -1,3 +1,5 @@
+;; Copyright (c) Michal Kurťák
+;; All rights reserved.
 (ns samples
   (:require [clojure.core.async :as a]
             [salt.client :as salt]
