@@ -52,11 +52,24 @@
            (map #(vector (keyword %) {:return "Done!" :success true})
                 minions))}}})
 
-(defn- send-data?
+(defn- find-job-resp
+  [error-minions running-minions]
+  {:return [(into {}  (concat
+                       (map (fn [m] [(keyword m) false]) error-minions)
+                       (map (fn [m] [(keyword m) {}]) running-minions)))]})
+
+(defn- send-minion-success?
   [r]
   (u/submap?
    {:command :send
     :body [{:minion "m1", :return "Done!", :success true}]} r))
+
+(defn- send-minion-failure?
+  [r]
+  (u/submap?
+   {:command :send
+    :body [{:minion "m1"
+            :success false}]} r))
 
 (deftest async-test
   (let [correlation-id (java.util.UUID/randomUUID)]
@@ -106,7 +119,6 @@
        (is (= :receive (:command r))) (async/handle-response
                                        [:connection
                                         (connected-resp correlation-id)])
-       (is (= :receive (:command r))) (async/handle-response nil)
        (is (= :send (:command r))) (async/handle-response
                                     (minion-return-resp "1" "m2"))
        (is (= :receive (:command r))) (async/handle-response nil)
@@ -165,10 +177,9 @@
                                        (connected-resp :all))
        (is (= :receive (:command r))) (async/handle-response
                                        (request-resp "1" ["m1" "m2"]))
-       (is (= :receive (:command r))) (async/handle-response nil)       
        (is (= :reconnect (:command r))) (async/handle-response (reconnect-resp))
-       (is (send-data? r)) (async/handle-response
-                            (print-job-resp "1" ["m1"]))
+       (is (send-minion-success? r)) (async/handle-response
+                                      (print-job-resp "1" ["m1"]))
        (is (= :receive (:command r))) (async/handle-response nil)
        (is (= :send (:command r))) (async/handle-response
                                     (minion-return-resp "1" "m2"))
@@ -183,10 +194,42 @@
                                        (connected-resp :all))
        (is (= :receive (:command r))) (async/handle-response
                                        (request-resp "1" ["m1" "m2"]))
-       (is (= :receive (:command r))) (async/handle-response nil)       
        (is (= :reconnect (:command r))) (async/handle-response (reconnect-resp))
        (is (= :error (:command r))) (async/handle-response
                                      (ex-info "Error!" {}))
        (is (= :unsubscribe (:command r))) (async/handle-response nil)
        (is (= :exit (:command r))) (async/handle-response nil)))))
+
+(deftest async-minion-timeout-test
+  (let [correlation-id (java.util.UUID/randomUUID)]
+    (testing "async minion job timeout"
+      (u/test-flow->
+       (initial-op correlation-id) r
+       (is (= :connect (:command r))) (async/handle-response nil)
+       (is (= :request (:command r))) (async/handle-response
+                                       (connected-resp :all))
+       (is (= :receive (:command r))) (async/handle-response
+                                       (request-resp "1" ["m1" "m2"]))
+       (is (= :find-job (:command r))) (async/handle-response [:timeout])
+       (is (send-minion-failure? r)) (async/handle-response
+                                      (find-job-resp ["m1"] ["m2"]))
+       (is (= :receive (:command r))) (async/handle-response nil)
+       (is (= :send (:command r))) (async/handle-response
+                                    (minion-return-resp "1" "m2"))
+       (is (= :unsubscribe (:command r))) (async/handle-response nil)
+       (is (= :exit (:command r))) (async/handle-response nil)))
+    (testing "async minion job timeout and error"
+      (u/test-flow->
+       (initial-op correlation-id) r
+       (is (= :connect (:command r))) (async/handle-response nil)
+       (is (= :request (:command r))) (async/handle-response
+                                       (connected-resp :all))
+       (is (= :receive (:command r))) (async/handle-response
+                                       (request-resp "1" ["m1" "m2"]))
+       (is (= :find-job (:command r))) (async/handle-response [:timeout])
+       (is (send-minion-failure? r)) (async/handle-response
+                                      (ex-info "Find job error!" {}))
+       (is (= :unsubscribe (:command r))) (async/handle-response nil)
+       (is (= :exit (:command r))) (async/handle-response nil)))
+    ))
 

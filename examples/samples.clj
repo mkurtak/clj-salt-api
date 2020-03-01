@@ -58,7 +58,7 @@
 
 (defn local-async-in-parallel
   "Demonstrates how to execute two different modules with local async client in
-   parallel, print results from commands as they come and block until commands
+   parallel, print results from commands as they come and block until all commands
    return."
   []
   (let [cl (example-client)

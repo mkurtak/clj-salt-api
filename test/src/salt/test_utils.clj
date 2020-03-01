@@ -31,4 +31,23 @@
     (every? (fn [[k v]] (and (contains? m2 k)
                              (submap? v (get m2 k))))
             m1)
-    (= m1 m2)))
+    (if (and (coll? m1) (coll? m2))
+      (every? (fn [v] (some #(submap? v %) m2))
+              m1)
+      (= m1 m2))
+    ))
+
+(comment
+  (submap? {:command :send
+            :conf {:val1 "val1"}
+            :body [{:minion "m1"
+                    :success false}]}
+           {:command :send
+            :test "test1"
+            :conf {:val1 "val1"
+                   :val2 "val2"}
+            :body [{:minion "m1"
+                    :more "Test"
+                    :success false}]
+            })
+  )

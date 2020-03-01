@@ -22,4 +22,5 @@
                                  "target/clj-salt-api.jar"]}
            :deploy {:extra-deps {deps-deploy {:mvn/version "0.0.9"}}
                     :main-opts ["-m" "deps-deploy.deps-deploy" "deploy"
-                                "target/clj-salt-api.jar"]}}}
+                                "target/clj-salt-api.jar"]}
+           :examples {:extra-paths ["examples"]}}}

@@ -67,7 +67,9 @@
   "Executes salt request. Puts one response or error to `resp-chan`.
 
   `client-atom` client created with [[salt.client/client]]
-  `req` ring request map (see [[aleph.http/request]] documentation)
+  `req` ring request map (see [[aleph.http/request]] documentation).
+         This is plain salt-api HTTP request data
+         merged with client  `::salt.core/default-http-request`
   `resp-chan` core.async channel to deliver response. defaults to chan
 
   `resp-chan` will deliver:
@@ -83,7 +85,11 @@
   "Executes salt request on async client. Puts minion responses or error to `resp-chan`.
 
   `client-atom` client created with [[salt.client/client]]
-  `req` ring request map (see [[aleph.http/request]] documentation)
+  `req` ring request map (see [[aleph.http/request]] documentation).
+        This is plain salt-api HTTP request data
+        merged with client  `::salt.core/default-http-request`.
+        Async request reuses salt client `:timeout` form parameter in the same
+        manner as https://docs.saltstack.com/en/latest/ref/clients/index.html#salt.client.LocalClient
   `resp-chan` core.async channel to deliver response. defaults to chan
 
   `resp-chan` will deliver:
