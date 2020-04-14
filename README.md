@@ -76,7 +76,7 @@ clj-salt-api manages single HTTP connection to /events endpoint and sends salt e
 ;; Create cancel channel
 (def cancel-chan (a/chan))
 
-;; Listen to saltstack eventbus, events will be deliverd to events-chan
+;; Listen to saltstack eventbus, events will be delivered to events-chan
 (def events-chan (salt/events client cancel-chan))
 
 ;; Take one event
@@ -88,7 +88,7 @@ clj-salt-api manages single HTTP connection to /events endpoint and sends salt e
 ;; ...
 
 ;; Cancel listening to saltstack eventbus
-(a/>!! cancel-chan)
+(a/>!! cancel-chan "")
 
 ;; Close client
 (salt/close client)

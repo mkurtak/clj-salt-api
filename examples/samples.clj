@@ -4,8 +4,7 @@
   (:require [clojure.core.async :as a]
             [salt.client :as salt]
             [salt.core :as s]
-            [samples-async :refer [print-and-close throw-err]]
-            [salt.test-utils :as u]))
+            [samples-async :refer [print-and-close throw-err]]))
 
 (defn- example-client
   []
@@ -16,16 +15,6 @@
                 ::s/sse-keep-alive? true
                 ::s/default-http-request {:connection-timeout 3000
                                           :request-timeout 5000}}))
-
-(defn- jdev1-client
-  []
-  (salt/client {::s/master-url "http://jdev1.nike.sk:8000"
-                ::s/username "saltapi"
-                ::s/password "saltapi"
-                ::s/max-sse-retries 3
-                ::s/sse-keep-alive? true
-                ::s/default-http-request {:connection-timeout 3000
-                                          :request-timeout 5000}})  )
 
 (defn local-test-ping
   "Ping minions with local sync client using list matcher,
