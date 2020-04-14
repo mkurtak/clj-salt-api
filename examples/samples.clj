@@ -4,11 +4,22 @@
   (:require [clojure.core.async :as a]
             [salt.client :as salt]
             [salt.core :as s]
-            [samples-async :refer [print-and-close throw-err]]))
+            [samples-async :refer [print-and-close throw-err]]
+            [salt.test-utils :as u]))
 
 (defn- example-client
   []
   (salt/client {::s/master-url "http://192.168.50.10:8000"
+                ::s/username "saltapi"
+                ::s/password "saltapi"
+                ::s/max-sse-retries 3
+                ::s/sse-keep-alive? true
+                ::s/default-http-request {:connection-timeout 3000
+                                          :request-timeout 5000}}))
+
+(defn- jdev1-client
+  []
+  (salt/client {::s/master-url "http://jdev1.nike.sk:8000"
                 ::s/username "saltapi"
                 ::s/password "saltapi"
                 ::s/max-sse-retries 3
@@ -140,6 +151,54 @@
     (print-and-close cl (salt/request-async cl
                                             {:form-params {:client "wheel_async"
                                                            :fun "key.list_all"}}))))
+
+(defn local-async-graceful-shutdown
+  "Demonstrates behavior when client is closed during the async request."
+  []
+  (let [cl (example-client)
+        res-chan (salt/request-async
+                  cl
+                  {:form-params {:client "local_async"
+                                 :tgt "*"
+                                 :fun "cmd.run"
+                                 :arg ["sleep 20"]}})]
+    (a/<!! (a/timeout 2000))
+    (salt/close cl)
+    (print-and-close cl res-chan)))
+
+(defn- read-channel-quiet
+  "Read channel and ignore responses until channel is empty."
+  [resp-chan]
+  (a/go-loop []
+    (when (a/<! resp-chan)
+      (recur))))
+
+(defn- read-events-and-cancel
+  "Take 3 messages from `events-chan`, then put empty string to `cancel-chan`"
+  [events-chan cancel-chan]
+  (a/go-loop [c 0]
+    (when-let [res (a/<! events-chan)]
+      (println "stream" res)
+      (if (< c 2)
+        (recur (inc c))
+        (do
+          (println "cancelling events")
+          (a/>! cancel-chan ""))))))
+
+(defn- events-stream
+  "Demonstrates listening to all saltstack data events.
+  Listen to 3 events and cancel listening."
+  []
+  (let [cl (example-client)
+        cancel-chan (a/chan)
+        events-chan (salt/events cl cancel-chan)
+        resp-chan (salt/request-async cl {:form-params {:client "local_async"
+                                                        :tgt "*"
+                                                        :fun "test.ping"}})]
+    (read-channel-quiet resp-chan)       ;read resp-chan to prevent sse backpressure
+    (a/<!! (read-events-and-cancel events-chan cancel-chan))
+    (salt/close cl)))
+
 (comment
   (local-test-ping)
   (local-async-test-ping)
@@ -150,4 +209,6 @@
   (local-async-grains-items)
   (runner-async-manage-present)
   (wheel-async-key-list-all)
+  (local-async-graceful-shutdown)
+  (events-stream)
   )

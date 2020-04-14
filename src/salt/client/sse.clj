@@ -7,23 +7,23 @@
             [salt.client.request :as req]))
 
 (defn- closeable?
-  [{:keys [:subscription-count :sse-retries]
-    {:keys [::s/sse-keep-alive? ::s/max-sse-retries]} :client}]
-  (or  (> sse-retries max-sse-retries)
-       (and (false? sse-keep-alive?)
-            (= 0 subscription-count))))
+  [{:keys [:subscription-count]
+    {:keys [::s/sse-keep-alive?]} :client}]
+  (and (false? sse-keep-alive?)
+       (= 0 subscription-count)))
 
 (defn- initial-command
   [op]
   (if (not (closeable? op)) :validate :park))
 
 (defn initial-op
-  ([client-atom] (initial-op client-atom {}))
-  ([client-atom req]
+  ([client-atom resp-chan] (initial-op client-atom resp-chan {}))
+  ([client-atom resp-chan req]
    (let [op {:request req
              :retry-timeout 500
              :subscription-count 0
              :sse-retries 0
+             :sse-mult (a/mult resp-chan)
              :client @client-atom}]
      (assoc op :command (initial-command op)))))
 
@@ -44,6 +44,11 @@
   [retry-timeout retries]
   (/ retry-timeout (inc retries)))
 
+(defn- connected-message
+  [correlation-id]
+  {:type :connected
+   :correlation-id correlation-id})
+
 (defn- handle-request
   [{:keys [:sse-retries :retry-timeout] :as op}
    [_ {:keys [:type] :as response} channel]]
@@ -62,35 +67,24 @@
              :connection (assoc response :chan channel)
              :sse-retries 0
              :retry-timeout (reset-retry-timeout retry-timeout sse-retries)
-             :body {:type :connected :correlation-id :all})
+             :body (connected-message :all))
       (assoc op
              :command :error
              :body (error-body op (ex-info (str "Invalid type " type " received")
                                            {:response response}))))))
 
-(defn- invalid-subscribe-response
-  [{:keys [:type :correlation-id] :as subscribe-command}]
-  {:type :connected
-   :correlation-id correlation-id
-   :error (ex-info (str "Invalid type " type " received")
-                   {:response subscribe-command})})
-
 (defn- handle-receive-subscription
   [{:keys [:subscription-count] :as op}
-   {:keys [:type :correlation-id] :as subscribe-command}]
+   {:keys [:type :correlation-id]}]
   (case type
     :subscribe (assoc op
                       :subscription-count (inc subscription-count)
                       :command :send
-                      :body {:type :connected
-                             :correlation-id correlation-id})
+                      :body (connected-message correlation-id))
     :unsubscribe (as-> op next
                    (assoc next :subscription-count (dec subscription-count))
                    (assoc next :command (if (closeable? next) :close :receive)))
-    :exit (assoc op :command :exit)
-    (assoc op
-           :command :send
-           :body (invalid-subscribe-response subscribe-command))))
+    :exit (assoc op :command :exit)))
 
 (defn- handle-receive-event
   [{:keys [:subscription-count] :as op}
@@ -129,7 +123,7 @@
 
 (defn- handle-park
   [{:keys [:subscription-count :retry-timeout :sse-retries] :as op}
-   [_ {:keys [:type] :as subscribe-command}]]
+   [_ {:keys [:type]}]]
   (case type 
     :subscribe (assoc op
                       :subscription-count (inc subscription-count)
@@ -139,18 +133,31 @@
     :unsubscribe (assoc op
                         :subscription-count (dec subscription-count)
                         :command :park)
-    :exit (assoc op :command :exit)
-    (assoc op
-           :command :send
-           :body (invalid-subscribe-response subscribe-command))))
+    :exit (assoc op :command :exit)))
+
+(defn- handle-error-subscription
+  [{:keys [:subscription-count] :as op}
+   {:keys [:type]}]
+  (case type
+    :subscribe (assoc op
+                      :subscription-count (inc subscription-count)
+                      :command :error
+                      :body nil)
+    :unsubscribe (assoc op
+                        :subscription-count (dec subscription-count)
+                        :command :error
+                        :body nil)
+    :exit (assoc op :command :exit)))
 
 (defn- handle-error
-  [{:keys [sse-retries retry-timeout] :as op}]
-  (let [retries (inc sse-retries)]
-    (assoc op
-           :command :close
-           :sse-retries retries
-           :retry-timeout (* retries retry-timeout))))
+  [{:keys [sse-retries retry-timeout] :as op} [channel msg]]
+  (if (= :subscription channel)
+    (handle-error-subscription op msg)
+    (let [retries (inc sse-retries)]
+      (assoc op
+             :command :close
+             :sse-retries retries
+             :retry-timeout (* retries retry-timeout)))))
 
 (defn handle-response
   [{:keys [command] :as op} response]
@@ -164,10 +171,25 @@
       :send (handle-send op)
       :close (handle-close op)
       :park (handle-park op response)
-      :error (handle-error op)
+      :error (handle-error op response)
       :exit nil)
     (catch Throwable e
       (assoc op :command :error :body (error-body op e)))))
+
+(defn- subscription!
+  [{:keys [:sse-mult]} {:keys [:type :recv-chan] :as msg}]
+  (case type
+    :subscribe (do
+                 (a/tap sse-mult recv-chan)
+                 msg)
+    :unsubscribe (do
+                   (a/untap sse-mult recv-chan)
+                   msg)
+    msg))
+
+(defn- unsubscribe-all!
+  [{:keys [:sse-mult]}]
+  (a/untap-all sse-mult))
 
 (defn sse
   "Invoke [[salt.api/sse]] request and returns `resp-chan` which deliver SSE events, subscription responses and error.
@@ -210,7 +232,7 @@
                  {sse-chan :chan :as connection} :connection
                  {pool-opts ::s/default-sse-pool-opts} :client
                  :as op}
-                (initial-op client-atom req)]
+                (initial-op client-atom resp-chan req)]
            (when command
              (->> (case command
                     :validate nil
@@ -218,18 +240,38 @@
                     :swap-login (req/swap-login! client-atom op)
                     :request (let [ch (api/sse body pool-opts)]
                                [:sse (a/<! ch) ch])
-                    :receive (let [[result ch] (a/alts! [subs-chan sse-chan]
-                                                        :prideority true)]
-                               (if (= ch subs-chan)
-                                 [:subscription result]
-                                 [:sse result]))
-                    :send (do (a/>! resp-chan body) nil)
+                    :receive (a/alt!
+                               subs-chan ([msg] [:subscription (subscription!
+                                                                @client-atom msg)])
+                               sse-chan ([msg] [:sse msg])
+                               :priority true)
+                    :send (a/>! resp-chan body)
                     :close (api/close-sse connection)
-                    :park [:subscription (a/<! subs-chan)]
+                    :park [:subscription (subscription!
+                                          @client-atom (a/<! subs-chan))]
                     :error (do
                              (when body (a/>! resp-chan body))
-                             (a/<! (a/timeout retry-timeout)))
-                    :exit (api/close-sse connection))
+                             (let [timeout-ch (a/timeout retry-timeout)]
+                               (a/alt!
+                                 subs-chan ([msg]
+                                            [:subscription (subscription! op msg)])
+                                 timeout-ch [:timeout])))
+                    :exit (do          
+                            ;; close http connection
+                            (api/close-sse connection)
+                            ;; do not accept any new subscriptions
+                            (a/close! subs-chan)
+                            ;; unblock all pending subscribers
+                            (->> (repeatedly #(a/poll! subs-chan))
+                                 (map subscription!)
+                                 (take-while identity))
+                            ;; send info to current subscribers
+                            ;; if they try to unsubscribe put will return false
+                            (a/>! resp-chan (connected-message :none))
+                            ;; unsub all
+                            (unsubscribe-all! op)
+                            ;; close response channel
+                            (a/close! resp-chan)))
                   (handle-response op)
                   (recur)))))
    resp-chan))

@@ -13,7 +13,8 @@
   ([] (initial-op nil))
   ([opts]
    (sse/initial-op
-    (c/client-not-started (merge {::s/master-url "/master"} opts)))))
+    (c/client-not-started (merge {::s/master-url "/master"} opts))
+    (a/chan))))
 
 (defn- send-body?
   [body m]
@@ -56,6 +57,10 @@
   ([correlation-id]
    [:subscription {:type :unsubscribe :correlation-id correlation-id}]))
 
+(defn- exit-resp
+  []
+  [:subscription {:type :exit}])
+
 (defn- login-err
   []
   (ex-info "Login exception" {}))
@@ -84,7 +89,7 @@
      (is (and (= :error (:command r))
               (some? (:body r)))) (sse/handle-response (login-err))
      (is (= :close (:command r))) (sse/handle-response nil)
-     (is (= :park (:command r))) (sse/handle-response nil)))
+     (is (= :validate (:command r))) (sse/handle-response nil)))
   
   (testing "login error retried"
     (u/test-flow->
@@ -111,7 +116,7 @@
      (is (and (= :error (:command r))
               (some? (:body r)))) (sse/handle-response (login-err))
      (is (= :close (:command r))) (sse/handle-response nil)
-     (is (= :park (:command r))) (sse/handle-response nil))))
+     (is (= :validate (:command r))) (sse/handle-response nil))))
 
 (deftest sse-subscriptions-test
   (testing "subscriptions keep-alive true"
@@ -141,16 +146,7 @@
      (is (= :receive (:command r))) (sse/handle-response nil)
      (is (= :close (:command r))) (sse/handle-response (unsubscribe-resp))
      (is (= :park (:command r)) (sse/handle-response nil))
-     ))
-
-  (testing "subscription error"
-    (u/test-flow->
-     (initial-op {::s/sse-keep-alive? false}) r
-     (is (and
-          (= :send (:command r))
-          (send-connected? "1" r)          
-          (instance? clojure.lang.ExceptionInfo (:error (:body r)))))
-     (sse/handle-response [:subscription {:type :unknown :correlation-id "1"}]))))
+     )))
 
 (deftest sse-reconnections-test
   (testing "reconnection success"
@@ -171,7 +167,27 @@
      (is (= :request (:command r))) (sse/handle-response nil)
      (is (send-connected? r)) (sse/handle-response (connect-resp))))
 
-  (testing "reconnection error"
+  (testing "reconnection error keep-alive false"
+    (u/test-flow->
+     (initial-op {::s/sse-keep-alive? false
+                  ::s/max-sse-retries 0}) r
+     (is (= :validate (:command r))) (sse/handle-response (subscribe-resp))
+     (is (= :login (:command r))) (sse/handle-response nil)
+     (is (= :swap-login (:command r))) (sse/handle-response (login-resp))
+     (is (= :request (:command r))) (sse/handle-response nil)
+     (is (send-connected? r)) (sse/handle-response (connect-resp))
+     (is (= :receive (:command r))) (sse/handle-response nil)
+     (is (= :send (:command r))) (sse/handle-response (data-resp))
+     (is (= :receive (:command r))) (sse/handle-response nil)
+     (is (= :close (:command r))) (sse/handle-response [:sse nil])
+     (is (= :validate (:command r))) (sse/handle-response nil)
+     (is (= :request (:command r))) (sse/handle-response nil)
+     (is (= :error (:command r))) (sse/handle-response
+                                   [:sse (ex-info "Unexpected Error" {})])
+     (is (= :error (:command r))) (sse/handle-response (unsubscribe-resp))
+     (is (= :close (:command r))) (sse/handle-response [:timeout nil])
+     (is (= :park (:command r))) (sse/handle-response nil)))
+  (testing "reconnection error keep-alive true"
     (u/test-flow->
      (initial-op {::s/sse-keep-alive? true
                   ::s/max-sse-retries 0}) r
@@ -189,8 +205,9 @@
      (is (= :request (:command r))) (sse/handle-response nil)
      (is (= :error (:command r))) (sse/handle-response
                                    [:sse (ex-info "Unexpected Error" {})])
-     (is (= :close (:command r))) (sse/handle-response nil)
-     (is (= :park (:command r))) (sse/handle-response nil))))
+     (is (= :error (:command r))) (sse/handle-response (unsubscribe-resp))
+     (is (= :close (:command r))) (sse/handle-response [:timeout nil])
+     (is (= :validate (:command r))) (sse/handle-response nil))))
 
 (deftest sse-data-test
   (testing "data"
@@ -209,5 +226,25 @@
      (is (and (= :send (:command r))
               (instance? clojure.lang.ExceptionInfo (:body r))))
      (sse/handle-response [:sse (ex-info "Data error" {})])
-     (is (= :receive (:command r))) (sse/handle-response nil)))
-  )
+     (is (= :receive (:command r))) (sse/handle-response nil))))
+
+(deftest sse-graceful-shutdown-test
+  (testing "shutdown-in-receive"
+    (u/test-flow->
+     (initial-op {::s/sse-keep-alive? true}) r
+     (is (= :login (:command r))) (sse/handle-response nil)
+     (is (= :swap-login (:command r))) (sse/handle-response (login-resp))
+     (is (= :request (:command r))) (sse/handle-response nil)
+     (is (send-connected? r)) (sse/handle-response (connect-resp))
+     (is (= :receive (:command r))) (sse/handle-response nil)
+     (is (= :exit (:command r))) (sse/handle-response (exit-resp))))
+  (testing "shudown-parked"
+    (u/test-flow->
+     (initial-op {::s/sse-keep-alive? false}) r
+     (is (= :exit (:command r))) (sse/handle-response (exit-resp))))
+  (testing "shudown-in-error"
+    (u/test-flow->
+     (initial-op {::s/max-sse-retries 1}) r
+     (is (= :login (:command r))) (sse/handle-response nil)
+     (is (= :error (:command r))) (sse/handle-response (login-err))
+     (is (= :exit (:command r))) (sse/handle-response (exit-resp)))))

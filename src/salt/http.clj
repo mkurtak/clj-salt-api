@@ -183,7 +183,7 @@
   If SSE request could not be made, exception is written to the channel and channel is closed."
   ([req] (sse req {}))
   ([req pool-opts]
-   (let [resp-chan (a/chan 10)]         ; todo how to set buffer size?
+   (let [resp-chan (a/chan 100)]         ; todo how to set buffer size?
      (connect (fn [] (-> (http/request (merge req {:throw-exceptions? false
                                                    :pool (sse-pool pool-opts)}))
                          (d/chain response->channel-response

@@ -4,15 +4,10 @@
   (:require [clojure.core.async :as a]
             [salt.api :as api]
             [salt.client.async :as async]
+            [salt.client.events :as events]
             [salt.client.request :as req]
             [salt.client.sse :as sse]
             [salt.core :as s]))
-
-(defn- sse-topic
-  "Messages of type `:connected` or errors are delivered to topic `:connection`
-   all other messages are delivered to topic `:data`"
-  [msg]
-  (if (or (instance? Throwable msg) (= :connected (:type msg))) :connection :data))
 
 (defn client-not-started
   "Create client atom with default values. Do not start sse."
@@ -22,20 +17,21 @@
                 ::s/max-sse-retries 3} opts)))
 
 (defn- client-start
+  "Start `sse/sse` and create channels subs and resp channels for communication.
+
+  Assoc `:sse-subs-chan` and `:sse-resp-chan` in `client-atom`"
   [client-atom]
-  (let [subs-chan (a/chan)
-        resp-chan (a/chan)
-        pub (a/pub resp-chan sse-topic)]
+  (let [subs-chan (a/chan)              ; no buffer for subscription channel
+        resp-chan (a/chan)]
     (sse/sse client-atom subs-chan resp-chan)
     (swap! client-atom assoc
            :sse-subs-chan subs-chan
-           :sse-resp-chan resp-chan
-           :sse-pub pub)
+           :sse-resp-chan resp-chan)
     client-atom))
 
 (defn client
   "Given a config map, create a client for saltstack api. Supported keys:
-  
+
   - `::salt.core/master-url`           - required, saltstack master base url
   - `::salt.core/username`             - optional, username to be used in salt auth
                                          system
@@ -50,15 +46,15 @@
   - `::salt.core/default-sse-pool-opts`- optional, default connection pool opts,
                                          see `aleph` documentation for more details.
   - `::salt.core/sse-keep-alive?`      - optional, if true /events SSE connection
-                                         will be always kept open, 
+                                         will be always kept open,
                                          if false /events SSE connection will be
                                          kept open only if there are active async
                                          requests, defaults to true
   - `::salt.core/max-sse-retries`      - optional, maximum number of errors before
-                                         /events SSE connection is retried. 
+                                         /events SSE connection is retried.
                                          If number of errors exceeds this value,
-                                         all async request receive an error and 
-                                         SSE behaves as sse-keep-alive? false, 
+                                         all async request receive an error and
+                                         SSE behaves as sse-keep-alive? false,
                                          defaults to 3"
   [opts]
   (client-start (client-not-started opts)))
@@ -82,7 +78,7 @@
    (req/request client-atom req resp-chan)))
 
 (defn request-async
-  "Executes salt request on async client. Puts minion responses or error to `resp-chan`.
+  "Executes salt request on async client. Puts master/minion responses or error to `resp-chan`.
 
   `client-atom` client created with [[salt.client/client]]
   `req` ring request map (see [[aleph.http/request]] documentation).
@@ -94,19 +90,35 @@
 
   `resp-chan` will deliver:
   - For each minion a map consisting of keys `[:minion :return :success]`
-  - Parsed salt-api response body
+  - For master response (wheel,runner) a map consisting off keys `[:return :success]`
   - Exception if error occurs (with response in meta)
 
   This function implements best practices for working with salt-api as defined in
   [https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices
-  If SSE reconnect occurs during the call, jobs.print_job is used to retrieve 
-  the state of job. 
+  If SSE reconnect occurs during the call, jobs.print_job is used to retrieve
+  the state of job.
 
   Channel is closed after response is delivered."
   ([client-atom req] (request-async client-atom req (a/chan)))
   ([client-atom req resp-chan]
-   (let [{:keys [:sse-subs-chan :sse-pub]} @client-atom]
-     (async/request-async client-atom req sse-subs-chan sse-pub resp-chan))))
+   (async/request-async client-atom req resp-chan)))
+
+(defn events
+  "Listen to saltstack data events. Puts all events and sse errors to `resp-chan`.
+
+  `client-atom` client created with [[salt.client/client]]
+  `cancel-chan` core.async channel to receive cancel message. defaults to chan
+  `resp-chan` core.async channel to deliver response. defaults to chan
+
+  `resp-chan` will deliver:
+  - data events (retry events will not be delivered)
+  - exceptions if saltstack sse encounters an error
+
+  To cancel and close `resp-chan`, send some message to `cancel-chan`."
+  ([client-atom] (events client-atom (a/chan) (a/chan)))
+  ([client-atom cancel-chan] (events client-atom cancel-chan (a/chan)))
+  ([client-atom cancel-chan resp-chan]
+   (events/events client-atom cancel-chan resp-chan)))
 
 (defn revoke-session
   "Logs out user from saltstack."

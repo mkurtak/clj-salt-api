@@ -6,7 +6,9 @@ Saltstack [salt-api](http://docs.saltstack.com/en/latest/ref/netapi/all/salt.net
 
 ## Rationale
 
-clj-salt-api is data oriented Clojure library for invoking salt-api. You only need three functions at runtime: `client`, which creates clj-salt-api client, `request`, which invokes sync operation on the client and `request-async` which invokes async operation on the client. Both request methods take a ring request as a parameter and return a core.async channel that delivers the response/responses.
+clj-salt-api is data oriented Clojure library for invoking salt-api. You only need four functions at runtime: `client`, which creates clj-salt-api client, `request`, which invokes sync operation on the client, `request-async` which invokes async operation on the client and `events` for listening all events on saltstack eventbus. Both request methods take a ring request as a parameter and return a core.async channel that delivers the response/responses.
+
+
 
 clj-salt-api handles authentication and implements [best practices for interacting with salt-api](https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices) as defined in salt.netapi modules specification:
 
@@ -32,12 +34,15 @@ clj-salt-api manages single HTTP connection to /events endpoint and sends salt e
                           ::s/max-sse-retries 3
                           ::s/sse-keep-alive? true}))
 
-;; Execute async request and collect responses from all minions in one vector
-(def minions-chan (salt/request-async client {:form-params {:client "local_async"
-                                                            :tgt "*"
-                                                            :fun "pkg.version"
-                                                            :arg ["vim"]}}))
-;; Take minion response
+;; Execute async request
+(def minions-chan (salt/request-async client
+                   {:form-params {:client "local_async"
+                                  :tgt "*"
+                                  :fun "pkg.version"
+                                  :arg ["vim"]}}))
+
+
+;; Take one minion response
 (a/<!! minions-chan)
 
 ;; Take another minion response
@@ -51,20 +56,54 @@ clj-salt-api manages single HTTP connection to /events endpoint and sends salt e
                              :form-params {:client "local"
                                            :tgt "*"
                                            :fun "test.ping"}}))
+;; Close client
+(salt/close client)
+```
+## Listening to saltstack eventbus
+
+```clojure
+(require '[salt.client :as salt]
+         '[salt.core :as s]
+         '[clojure.core.async :as a])
+
+;; Create a client
+(def client (salt/client {::s/master-url "http://localhost:8000"
+                          ::s/username "saltapi"
+                          ::s/password "saltapi"
+                          ::s/max-sse-retries 3
+                          ::s/sse-keep-alive? true}))
+
+;; Create cancel channel
+(def cancel-chan (a/chan))
+
+;; Listen to saltstack eventbus, events will be deliverd to events-chan
+(def events-chan (salt/events client cancel-chan))
+
+;; Take one event
+(a/<!! events-chan)
+
+;; Take another event
+(a/<!! events-chan)
+
+;; ...
+
+;; Cancel listening to saltstack eventbus
+(a/>!! cancel-chan)
 
 ;; Close client
 (salt/close client)
 ```
+
 ### Examples
 
 See [examples](examples) directory for more examples.
 
-### Supported clients
+### Supported saltstack client APIs
 
 - `request` function accepts `local, local_batch, runner` and `wheel` clients
 - `request-async` function accepts `local_async, runner_async` and `wheel_async` clients
 
-### Http client
+### Http
 
 clj-salt-api relies on [aleph](https://github.com/ztellman/aleph). Both `request` and `request-async` accept plain ring request maps and use `aleph` to execute requests. Please refer to `aleph` documenation for all http related configuration (timeouts, custom http headers, proxy configuration, client certificates, ...)
 

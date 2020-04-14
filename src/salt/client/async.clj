@@ -11,24 +11,33 @@
 
 (defn initial-op
   "Create initial operation. Minion timeout is same computed from saltstack client timeout setting. See https://docs.saltstack.com/en/latest/ref/clients/index.html#salt.client.LocalClient."
-  [req correlation-id]
+  [req correlation-id recv-chan]
   {:command :subscribe
    :request req
    :correlation-id correlation-id
    :master-client? (contains? master-clients (get-in req [:form-params :client]))
    :minion-timeout (* 1000 (get-in req [:form-params :timeout] 5))
-   :body {:type :subscribe :correlation-id correlation-id}})
+   :recv-chan recv-chan
+   :body {:type :subscribe
+          :correlation-id correlation-id
+          :recv-chan recv-chan}})
 
 (defn- handle-connect
   [{expected-correlation-id :correlation-id :as op}
-   {:keys [:type :correlation-id :error] :as response}]
-  (if (= :connected type)
-    (if (or (= expected-correlation-id correlation-id) (= :all correlation-id))
-      (if (some? error)
-        (assoc op :command :connect-error :body error)
-        (assoc op :command :request :body (req/create-request op)))
-      (assoc op :command :connect))
-    (assoc op :command :error :body response)))
+   {:keys [:type :correlation-id] :as response}]
+  (if (instance? Throwable response)
+    (assoc op :command :error :body response)
+    (if (= :connected type)
+      (cond
+        (or
+         (= expected-correlation-id correlation-id)
+         (= :all correlation-id)) (assoc op :command :request
+                                         :body (req/create-request op))
+        (= :none correlation-id) (assoc op :command :exit)
+        :else (assoc op :command :connect))
+      (if (nil? response)
+        (assoc op :command :exit)
+        (assoc op :command :connect)))))
 
 (defn- parse-request
   [{:keys [:master-client?] :as op} {:keys [:jid :minions :tag]}]
@@ -49,10 +58,12 @@
              (ex-info "No job returned from salt" {:response response})))))
 
 (defn- unsubscribe
-  [{:keys [:correlation-id] :as op}]
+  [{:keys [:correlation-id :recv-chan] :as op}]
   (assoc op
          :command :unsubscribe
-         :body {:type :unsubscribe :correlation-id correlation-id}))
+         :body {:type :unsubscribe
+                :correlation-id correlation-id
+                :recv-chan recv-chan}))
 
 (defn- handle-send
   [{:keys [:master-client? :minions] :as op}]
@@ -79,7 +90,9 @@
              :body returns
              :minions remaining-minions
              :last-receive-time (System/currentTimeMillis))
-      (assoc op :command :receive :body nil))))
+      (assoc op :command :receive
+             :body nil
+             :last-receive-time (System/currentTimeMillis)))))
 
 (defn- parse-print-job-minion-result
   [{:keys [:jid :minions] :as op} return]
@@ -135,16 +148,15 @@
 (defn- handle-receive-connection
   "Run jobs.print_job after reconnection. It is executed with runner_async client."
   [{:keys [:jid] :as op}
-   {:keys [:correlation-id] :as response}]
-  (if (instance? Throwable response)
-    (assoc op :command :error :body response)
-    (if (= :all correlation-id)
-      (assoc op :command :reconnect
-             :body {:form-params {:client "runner_async"
-                                  :fun "jobs.print_job"
-                                  :jid jid}}
-             :last-receive-time nil)
-      (assoc op :command :receive))))
+   {:keys [:correlation-id]}]
+  (case correlation-id
+    :all (assoc op :command :reconnect
+                :body {:form-params {:client "runner_async"
+                                     :fun "jobs.print_job"
+                                     :jid jid}}
+                :last-receive-time nil)
+    :none (assoc op :command :exit)
+    (assoc op :command :receive)))
 
 (defn- handle-receive-data-from-minion
   [{:keys [:minions] :as op} data]
@@ -174,8 +186,8 @@
 
 (defn- handle-receive-timeout
   "If job have not returns from minions, run saltutil.find_job with local client.
-   This request must be executed with sync client, because if minions will not 
-   respond, events will not appear on eventbus." 
+   This request must be executed with sync client, because if minions will not
+   respond, events will not appear on eventbus."
   [{:keys [:jid :minions] :as op}]
   (assoc op :command :find-job
          :body {:form-params {:client "local"
@@ -185,11 +197,21 @@
                               :arg [jid]}}))
 
 (defn- handle-receive
-  [op [channel msg]]
-  (case channel
-    :connection (handle-receive-connection op msg)
-    :data (handle-receive-data op msg)
-    :timeout (handle-receive-timeout op)))
+  [op [channel {:keys [:type] :as msg}]]
+  (if (= :receive channel)
+    (if (instance? Throwable msg)
+      (assoc op :command :error :body msg)
+      (if (= :connected type)
+        (handle-receive-connection op msg)
+        (if (nil? msg)
+          (assoc op :command :exit)
+          (handle-receive-data op msg))))
+    (handle-receive-timeout op)))
+
+(defn- handle-unsubscribe
+  "If unsubcribe is sucessful exit, ignore messages received while unsubcribing."
+  [op [channel]]
+  (assoc op :command (if (= :unsubscribe channel) :exit :unsubscribe)))
 
 (defn- handle-with-command
   [op command]
@@ -206,9 +228,8 @@
       :send (handle-send op)
       :reconnect (handle-reconnect op response)
       :find-job (handle-find-job op response)
-      :connect-error (handle-with-command op :exit)
       :error (unsubscribe op)
-      :unsubscribe (handle-with-command op :exit)
+      :unsubscribe (handle-unsubscribe op response)
       :exit nil)
     (catch Throwable e
       (assoc op :command :error :body e))))
@@ -218,13 +239,14 @@
   (if (sequential? x) x (vector x)))
 
 (defn- find-job-timeout
+  "Find job timeout is not computed in handler function but has to be computed in go block, because go block could be parked for period of time."
   [timeout last-request-time]
   (if last-request-time
     (- (+ last-request-time timeout) (System/currentTimeMillis))
     Integer/MAX_VALUE))
 
 (defn request-async
-  "Subscribe to `sse-pub`, invoke async client request and deliver responses in resp-chan.
+  "Subscribe with `sse-subs-chan`, invoke async client request and deliver responses in resp-chan.
 
   This function uses [[salt.client.request/request]] to call async client.
   Channel will deliver:
@@ -233,50 +255,46 @@
 
   This function implements best practices for working with salt-api as defined in
   https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices
-  If SSE reconnect occurs during the call, jobs.print_job is used to retrieve 
-  the state of job. 
+  If SSE reconnect occurs during the call, jobs.print_job is used to retrieve
+  the state of job.
 
   Channel is closed after all minions return.
-  Request will be merged with client default-http-request. 
+  Request will be merged with client default-http-request.
   See [[salt.client/client]] for more details."
-  [client-atom req subs-chan sse-pub resp-chan]
+  [client-atom req resp-chan]
   (let [correlation-id (java.util.UUID/randomUUID)
-        conn-chan (a/chan)
-        data-chan (a/chan 100)]
+        client @client-atom
+        subs-chan (:sse-subs-chan client)
+        recv-chan (a/chan)]
     (a/go
       (loop [{:keys [:command :body :last-receive-time :minion-timeout] :as op}
-             (initial-op req correlation-id)]
+             (initial-op req correlation-id recv-chan)]
         (when command
           (->>
            (case command
-             :subscribe (do (a/sub sse-pub :connection conn-chan)
-                            (a/sub sse-pub :data data-chan)
-                            (a/>! subs-chan body)
-                            nil)
-             :connect (a/<! conn-chan)
+             :subscribe (a/>! subs-chan body)
+             :connect (a/<! recv-chan)
              :request (a/<! (req/request client-atom body))
              :receive (let [timeout (find-job-timeout minion-timeout
                                                       last-receive-time)
-                            timeout-chan (a/timeout timeout)
-                            [result ch] (a/alts! [conn-chan timeout-chan data-chan]
-                                                 :priority true)]
-                        (condp = ch
-                          conn-chan [:connection result]
-                          data-chan [:data result]
-                          timeout-chan [:timeout]))
+                            timeout-chan (a/timeout timeout)]
+                        (a/alt!
+                          timeout-chan [:timeout]
+                          recv-chan ([result] [:receive result])))
+             :reconnect (a/<! (request-async client-atom body (a/chan)))
+             :find-job (a/<! (req/request client-atom body))
              :send (doseq [b (to-vec body)]
                      (a/>! resp-chan b))
-             :reconnect (a/<! (request-async client-atom body subs-chan sse-pub
-                                             (a/chan)))
-             :find-job (a/<! (req/request client-atom body))
-             :connect-error (a/>! resp-chan body)
              :error (a/>! resp-chan body)
-             :unsubscribe (a/>! subs-chan body)
+             ;; read receive channel while unsubscribing to prevent deadlock
+             :unsubscribe (a/alt!
+                            [[subs-chan body]] [:unsubscribe]
+                            recv-chan ([msg] [:receive msg]))
              :exit (do
-                     (a/unsub sse-pub :data data-chan)
-                     (a/unsub sse-pub :connection conn-chan)
-                     (a/close! conn-chan)
-                     (a/close! data-chan)
+                     ;; unblock all pending writers
+                     (a/close! recv-chan)
+                     (->> (repeatedly #(a/poll! recv-chan))
+                          (take-while identity))
                      (a/close! resp-chan)))
            (handle-response op)
            (recur)))))
