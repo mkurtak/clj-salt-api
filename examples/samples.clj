@@ -1,10 +1,8 @@
-;; Copyright (c) Michal Kurťák
-;; All rights reserved.
 (ns samples
   (:require [clojure.core.async :as a]
             [salt.client :as salt]
             [salt.core :as s]
-            [samples-async :refer [print-and-close throw-err]]))
+            [samples-utils :refer [print-and-close throw-err]]))
 
 (defn- example-client
   []
@@ -54,7 +52,7 @@
          {:form-params {:client "local_async"
                         :tgt "*"
                         :fun "pkg.show"
-                        :arg ["vim", "salt-minion"]
+                        :arg ["emacs", "salt-minion"]
                         :kwarg {:filter ["description-en", "installed-size"]}}}))))
 
 
@@ -76,12 +74,12 @@
                             {:form-params {:client "local_async"
                                            :tgt "*"
                                            :fun "pkg.show"
-                                           :arg ["vim"]
+                                           :arg ["emacs"]
                                            :kwarg {:filter ["description-en"]}}})])]
     (print-and-close cl res-chan)))
 
 (defn local-async-locate
-  "Locate by and limit results to 10 with local async client and locate module."
+  "Locate files and limit results to 10 with local async client and locate module."
   []
   (let [cl (example-client)]
     (print-and-close cl (salt/request-async

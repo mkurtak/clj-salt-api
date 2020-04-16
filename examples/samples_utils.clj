@@ -1,6 +1,6 @@
 ;; Copyright (c) Michal Kurťák
 ;; All rights reserved.
-(ns samples-async
+(ns samples-utils
   (:require [clojure.core.async :as a]
             [salt.client :as c]))
 

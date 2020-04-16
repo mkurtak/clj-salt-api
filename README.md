@@ -18,7 +18,7 @@ clj-salt-api handles authentication and implements [best practices for interacti
 
 > The /events endpoint is specifically designed to handle long-running HTTP connections and it exposes Salt's event bus which includes job returns. Watching this endpoint first, then executing asynchronous Salt commands second, is the most lightweight and scalable way to use rest_cherrypy while still receiving job returns in real-time. But this requires clients that can properly handle the inherent asynchronicity of that workflow.
 
-clj-salt-api manages single HTTP connection to /events endpoint and sends salt events to respective async requests. Response from each minion is delivered as separate value in core.async channel. clj-salt-api does all error handling and reconnections under the hood.
+clj-salt-api manages single HTTP connection to /events endpoint, submits jobs to saltstack and sends salt events to respective async requests. Response from each minion is delivered as separate value in core.async channel. clj-salt-api does all error handling and reconnections under the hood.
 
 ## Usage
 
@@ -39,7 +39,7 @@ clj-salt-api manages single HTTP connection to /events endpoint and sends salt e
                    {:form-params {:client "local_async"
                                   :tgt "*"
                                   :fun "pkg.version"
-                                  :arg ["vim"]}}))
+                                  :arg ["emacs"]}}))
 
 
 ;; Take one minion response
@@ -51,7 +51,7 @@ clj-salt-api manages single HTTP connection to /events endpoint and sends salt e
 ;; Take until minions-chan is closed
 ;; ...
 
-;; Execute sync request with custom timeouts
+;; Execute sync request with custom timeout
 (a/<!! (salt/request client {:request-timeout 5000
                              :form-params {:client "local"
                                            :tgt "*"

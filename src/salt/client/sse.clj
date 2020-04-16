@@ -59,7 +59,7 @@
       (assoc op
              :command :login
              :body (req/create-login-request op)
-             :sse-retries (inc sse-retries)) 
+             :sse-retries (inc sse-retries))
       (assoc op :command :error :body (error-body op response)))
     (if (= :connect type)
       (assoc op
@@ -124,7 +124,7 @@
 (defn- handle-park
   [{:keys [:subscription-count :retry-timeout :sse-retries] :as op}
    [_ {:keys [:type]}]]
-  (case type 
+  (case type
     :subscribe (assoc op
                       :subscription-count (inc subscription-count)
                       :sse-retries 0
@@ -193,27 +193,26 @@
 
 (defn sse
   "Invoke [[salt.api/sse]] request and returns `resp-chan` which deliver SSE events, subscription responses and error.
-  
+
   This function
   * logs in user if not already logged in and handles unauthorized exception
   * creates infinite go-loop listens to `subs-chan` and write SSE to `resp-chan`
 
   To receive SSE events client should:
-  - create a [[core.async/pub]] on `resp-chan` and receive responses
   - put {:type :subscribe :correlation-id} to subs-chan
-  - take for connection response from `resp-chan` {:type :connect :correlation-id} 
-  - execute [[salt.client.request/request]] with async client
-  - take SSE events
+  - take  connection response from `resp-chan` {:type :connect :correlation-id}
+  - execute [[salt.client.request/request]] with async client and remember job id
+  - take SSE events and wait for job id response
 
   Details:
-  
+
   Takes values from `subs-chan`
   | Key                | Description |
   | -------------------| ------------|
-  | :type :subscribe   | Subscribe with correlation id
-  | :type :unsubscribe | Unsubscribe
+  | :type :subscribe   | Add subscriber with correlation id
+  | :type :unsubscribe | Remove subscriber with correlation id
   | :type :exit        | Quit go-loop
-  
+
   Channel will deliver:
   | Response         | Description |
   | -----------------| ------------|
@@ -256,7 +255,7 @@
                                  subs-chan ([msg]
                                             [:subscription (subscription! op msg)])
                                  timeout-ch [:timeout])))
-                    :exit (do          
+                    :exit (do
                             ;; close http connection
                             (api/close-sse connection)
                             ;; do not accept any new subscriptions
