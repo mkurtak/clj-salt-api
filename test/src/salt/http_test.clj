@@ -90,10 +90,8 @@
 
   (testing "mapcat-with-previous"
     (is (empty?
-         (into [] (http/mapcat-with-previous http/sse-buffer->events)
+         (into [] (http/mapcat-with-accumulator http/sse-buffer->events)
                ["data:value" "\n"])))
     (is (= [{:type :data :data "value"}]
-           (into [] (http/mapcat-with-previous http/sse-buffer->events)
+           (into [] (http/mapcat-with-accumulator http/sse-buffer->events)
                  ["data:value" "\n" "\n"])))))
-
-

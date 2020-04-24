@@ -11,8 +11,8 @@
             [salt.core :as s]))
 
 (def retriable-status-codes
-  "Set pof retriable status codes based on 
-  https://en.wikipedia.org/wiki/List_of_HTTP_status_codes"  
+  "Set pof retriable status codes based on
+  https://en.wikipedia.org/wiki/List_of_HTTP_status_codes"
   #{408 500 502 503 504 509 520 521 522 523 524 598 599})
 
 (defn- status-code->category
@@ -62,7 +62,7 @@
 (defn request
   "Invoke `aleph.http/request` and transform manifold deferred to core.async channel.
   Return new channel delivering response:
-  
+
   * Ring response if ok
   * Exception if error occurs"
   [req]
@@ -120,10 +120,11 @@
   (= :retry (first field)))
 
 (defn sse-buffer->events
+  "Converts sse buffer to collection of events and next buffer value"
   [buf prev-buf]
   (let [buf-splits (str/split (str prev-buf buf) last-empty-line-pattern 2)
         no-splits (= 1 (count buf-splits))
-        chunks (if no-splits nil (str/split (first buf-splits) empty-line-pattern)) 
+        chunks (if no-splits nil (str/split (first buf-splits) empty-line-pattern))
         next-prev (if no-splits (first buf-splits) (second buf-splits))]
     [(->> chunks
           (mapcat (fn [chunk]
@@ -140,24 +141,28 @@
                                     (reduce-sse-fields fields)))))))))
      next-prev]))
 
-(defn mapcat-with-previous
+(defn mapcat-with-accumulator
+  "Returns transducer similar to mapcat but with accumulator.
+  f accepts current val and accumulator from previous call of f
+  f returns coll and next val of accumulator"
   [f]
   (comp
    (fn [rf]
-     (let [pv (volatile! nil)]
+     (let [acc (volatile! nil)]
        (fn
          ([] (rf))
          ([result] (rf result))         ; todo what to do with remaining pv?
          ([result input]
-          (let [[items pval] (f input @pv)]
-            (vreset! pv pval)
+          (let [[items next-acc-val] (f input @acc)]
+            (vreset! acc next-acc-val)
             (rf result items))))))
    cat))
 
 (defn- sse-pool
+  "Creates aleph http connection-pool merge options with default options"
   [{:keys [:connection-options] :as opts}]
   (http/connection-pool (merge opts
-                               {:total-connections 2
+                               {:total-connections 2 ; wanted 1 but did not work
                                 :max-queue-size 1
                                 :target-utilization 1
                                 :connection-options (merge
@@ -171,19 +176,19 @@
   Pool could be customized with `pool-opts` (see [[aleph.http/request]] documentation).
 
   Server-sent events is a stream of text lines separated by empty lines.
-  
+
   Returns new channel delivering server-sent events with following types
   | Type       | Attributes | Description
   | -----------| -----------|
-  | `:connect` | :stream    | Connection is established. Use :stream to close SSE. 
+  | `:connect` | :stream    | Connection is established. Use :stream to close SSE.
   | `:data`    | :id :data  | One SSE event. When event contains multiple data attributes, they are concatenated with newline character.
   | `:retry`   | :retry     | SSE indicates to set retry-timeout.
   | `:close`   |            | Sent before stream and respective core.async channel is closed.
-  
+
   If SSE request could not be made, exception is written to the channel and channel is closed."
   ([req] (sse req {}))
   ([req pool-opts]
-   (let [resp-chan (a/chan 100)]         ; todo how to set buffer size?
+   (let [resp-chan (a/chan 1)]         ; todo how to set buffer size?
      (connect (fn [] (-> (http/request (merge req {:throw-exceptions? false
                                                    :pool (sse-pool pool-opts)}))
                          (d/chain response->channel-response
@@ -193,7 +198,7 @@
                                        %)
                                   #(ms/map bs/to-string %)
                                   #(ms/filter some? %)
-                                  #(ms/transform (mapcat-with-previous
+                                  #(ms/transform (mapcat-with-accumulator
                                                   sse-buffer->events)
                                                  %)
                                   #(ms/map (fn [x] (a/>!! resp-chan x) x) %)
@@ -208,7 +213,7 @@
 
 (defn parse-body
   "Parse body from `response` using content-type header to determine format.
-  
+
    If content-type is missing or unsupported, or parsing error occurs, throw ex with response in data.
    If body is not present, return nil.
    If body is successfully parsed, return map and full response in meta."

@@ -22,12 +22,18 @@
   (and token (number? expire) (< (/ (System/currentTimeMillis) 1000) expire)))
 
 (defn handle-validate-token
+  "If token is valid execute HTTP request on SSE /events endpoint,
+  otherwise execute HTTP request on /login endpoint."
   [{:keys [:client] :as op}]
   (if (token-valid? client)
     (assoc op :command :request :body (create-request op))
     (assoc op :command :login :body (create-login-request op))))
 
 (defn- handle-request
+  "If response is not exception, next send response to resp-chan
+  else if response is Throwable
+  * if it is unauthorized, execute login
+  * send error to resp-chan otherwise"
   [op response]
   (if (= :unauthorized (::s/response-category (ex-data response)))
     (assoc op

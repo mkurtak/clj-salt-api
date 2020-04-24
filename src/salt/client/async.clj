@@ -123,6 +123,10 @@
       (parse-print-job-minion-result op return))))
 
 (defn- parse-find-job-error-minions
+  "Filter minions which have not returned response to saltutil.find_job
+  and return error responses.
+  Minions which return find_job successfully are ignored,
+  because they have meanwhile published events to saltstack eventbus"
   [return]
   (->> return
        (filter (fn [[_ v]] (false? v)))
@@ -245,6 +249,18 @@
     (- (+ last-request-time timeout) (System/currentTimeMillis))
     Integer/MAX_VALUE))
 
+(defn- graceful-shutdown
+  "Graceful shutdown in three steps
+  Async request is already unsubscribed but there could be unread responses.
+  1. close recv-channel - no more minion responses could be delivered
+  2. read pending minion responses and throw them away
+  3. close resp-channel"
+  [recv-chan resp-chan]
+  (a/close! recv-chan)
+  (->> (repeatedly #(a/poll! recv-chan))
+       (take-while identity))
+  (a/close! resp-chan))
+
 (defn request-async
   "Subscribe with `sse-subs-chan`, invoke async client request and deliver responses in resp-chan.
 
@@ -275,9 +291,9 @@
              :subscribe (a/>! subs-chan body)
              :connect (a/<! recv-chan)
              :request (a/<! (req/request client-atom body))
-             :receive (let [timeout (find-job-timeout minion-timeout
-                                                      last-receive-time)
-                            timeout-chan (a/timeout timeout)]
+             :receive (let [timeout-chan (a/timeout
+                                          (find-job-timeout minion-timeout
+                                                            last-receive-time))]
                         (a/alt!
                           timeout-chan [:timeout]
                           recv-chan ([result] [:receive result])))
@@ -290,12 +306,7 @@
              :unsubscribe (a/alt!
                             [[subs-chan body]] [:unsubscribe]
                             recv-chan ([msg] [:receive msg]))
-             :exit (do
-                     ;; unblock all pending writers
-                     (a/close! recv-chan)
-                     (->> (repeatedly #(a/poll! recv-chan))
-                          (take-while identity))
-                     (a/close! resp-chan)))
+             :exit (graceful-shutdown recv-chan resp-chan))
            (handle-response op)
            (recur)))))
     resp-chan))

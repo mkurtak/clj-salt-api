@@ -36,7 +36,7 @@
      (is (= :login (:command r))) (r/handle-response nil)
      (is (= :error (:command r))) (r/handle-response
                                    (ex-info "Login exception" {}))))
-  
+
   (testing "invalid token"
     (u/test-flow->
      (initial-op (login-resp -1000)) r
@@ -47,7 +47,7 @@
     (u/test-flow->
      (initial-op (login-resp)) r
      (is (= :request (:command r))) (r/handle-response nil)))
-  
+
   (testing "unauthorized error"
     (u/test-flow->
      (initial-op) r
@@ -58,7 +58,6 @@
                                    (ex-info
                                     "Unauthorized" {::s/response-category
                                                     :unauthorized})))    )
-  
   (testing "request exception"
     (u/test-flow->
      (initial-op) r
@@ -67,4 +66,3 @@
      (is (= :request (:command r))) (r/handle-response nil)
      (is (= :error (:command r))) (r/handle-response
                                    (ex-info "Unexpected Error" {})))))
-

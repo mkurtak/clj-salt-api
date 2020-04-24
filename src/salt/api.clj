@@ -39,7 +39,7 @@
   [{:keys [::s/master-url :url :method :headers :content-type]
     {:keys [:token]} ::s/login-response
     :or {method :post content-type :json}
-    :as opts}]  
+    :as opts}]
   (merge opts
          {:url (add-url-path master-url url)
           :method method
@@ -70,11 +70,11 @@
 (defn login
   "Executes login [[salt.http/request]], handles exception, parses body and return new channel with response.
 
-  Prepends master-url and appends '/login' to ring request url.    
+  Prepends master-url and appends '/login' to ring request url.
   Request is retried with default backoff and retriable?. See [[salt.retry/with-retry]] for more details.
   Exception and parsed body is sent with channel and channel is closed afterwards.
   Request is aleph ring request with additonal keys:
-  
+
   | Key                      | Description |
   | -------------------------| ------------|
   | `::salt.core/master-url` | Base url of salt-master. Its prepended to ring :url
@@ -93,11 +93,11 @@
 (defn request
   "Executes [[salt.http/request]], handles exception, parses body and return new channel with response.
 
-  Prepends master-url to ring request url.    
+  Prepends master-url to ring request url.
   Request is retried with default backoff and retriable?. See [[salt.retry/with-retry]] for more details.
   Exception and parsed body is sent with channel and channel is closed afterwards.
   Request is aleph ring request with additonal keys:
-  
+
   | Key                           | Description |
   | ------------------------------| ------------|
   | `::salt.core/master-url`      | Base url of salt-master. Its prepended to ring :url
@@ -123,7 +123,7 @@
   If exception occurs, it is written to the channel and channel is closed.
   If SSE connection is closed, channel is closed.
   Request is aleph ring request with additonal keys
-  
+
   | Key                           | Description |
   | ------------------------------| ------------|
   | `::salt.core/master-url`      | Base url of salt-master. It is preepended :url
