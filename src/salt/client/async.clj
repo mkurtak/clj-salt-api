@@ -33,7 +33,6 @@
          (= expected-correlation-id correlation-id)
          (= :all correlation-id)) (assoc op :command :request
                                          :body (req/create-request op))
-        (= :none correlation-id) (assoc op :command :exit)
         :else (assoc op :command :connect))
       (if (nil? response)
         (assoc op :command :exit)
@@ -42,8 +41,8 @@
 (defn- parse-request
   [{:keys [:master-client?] :as op} {:keys [:jid :minions :tag]}]
   (if master-client?
-    (assoc op :jid jid :job-tag (str tag "/ret") :command :receive)
-    (assoc op :jid jid :job-tag (str "salt/job/" jid "/ret")
+    (assoc op :jid jid :job-tag (str tag "/ret") :command :receive) ; master clients (runner, wheel)
+    (assoc op :jid jid :job-tag (str "salt/job/" jid "/ret")        ; minion clients have jid
            :minions (set minions)
            :command :receive
            :last-receive-time (System/currentTimeMillis))))
@@ -71,17 +70,8 @@
     (unsubscribe op)
     (assoc op :command :receive :body nil)))
 
-(defn- parse-print-job-minions-returns
-  [return jid minions]
-  (->> (:Result (get return (keyword (str jid))))
-       (map #(vector (name (first %)) (second %)))
-       (filter #(contains? minions (first %)))
-       (map #(assoc {}
-                    :minion (first %)
-                    :return (:return (second %))
-                    :success (:success (second %))))))
-
 (defn parse-job-returns
+  "Remove returned minions from set of expecting minions and store `:last-receive-time`."
   [{:keys [:minions] :as op} returns]
   (let [result-minions (set (map :minion returns))
         remaining-minions (st/difference minions result-minions)]
@@ -94,11 +84,43 @@
              :body nil
              :last-receive-time (System/currentTimeMillis)))))
 
+(defn- parse-print-job-minions-returns
+  "Example of minion print_job return:
+  {:20200511183953191117
+   {:Function test.ping,
+    :Result {:minion1 {:return true, :retcode 0, :success true},
+             :minion2 {:return true, :retcode 0, :success true}},
+    :Target *,
+    :Target-type glob,
+    :Arguments [],
+    :StartTime 2020, May 11 18:39:53.191117,
+    :Minions [minion1 minion2],
+    :User saltapi}}"
+  [return jid minions]
+  (->> (:Result (get return (keyword (str jid))))
+       (map #(vector (name (first %)) (second %)))
+       (filter #(contains? minions (first %)))
+       (map #(assoc {}
+                    :minion (first %)
+                    :return (:return (second %))
+                    :success (:success (second %))))))
+
 (defn- parse-print-job-minion-result
   [{:keys [:jid :minions] :as op} return]
   (parse-job-returns op (parse-print-job-minions-returns return jid minions)))
 
 (defn- parse-print-job-master-return
+  "Example of master print_job return:
+  {:20200511190954107304
+   {:Result {:saltmaster.local_master
+              {:return {:fun_args [],
+                        :jid 20200511190954107304,
+                        :return [minion1 minion2],
+                        :success true,
+                        :_stamp 2020-05-11T19:09:54.903072,
+                        :user saltapi, :fun runner.manage.present}}},
+    :StartTime 2020, May 11 19:09:54.107304,
+    :Error Cannot contact returner or no job with this jid}}"
   [return jid]
   (let  [result (-> (get return (keyword (str jid)))
                     :Result
@@ -114,9 +136,8 @@
          :body (parse-print-job-master-return return jid)))
 
 (defn- handle-reconnect
-  [{:keys [:master-client?] :as op} {:keys [:return :success] :as response}]
-  (if (or (instance? Throwable response)
-          (false? success))
+  [{:keys [:master-client?] :as op} {[return] :return :as response}]
+  (if (or (instance? Throwable response))
     (assoc op :command :error :body response)
     (if master-client?
       (parse-print-job-master-result op return)
@@ -150,19 +171,22 @@
     (parse-job-returns op (parse-find-job-error-minions return))))
 
 (defn- handle-receive-connection
-  "Run jobs.print_job after reconnection. It is executed with runner_async client."
+  "Run jobs.print_job after reconnection.
+  This request must be executed with sync runner client, because starting
+  another async request will block this caller on recv-chan."
   [{:keys [:jid] :as op}
    {:keys [:correlation-id]}]
-  (case correlation-id
-    :all (assoc op :command :reconnect
-                :body {:form-params {:client "runner_async"
-                                     :fun "jobs.print_job"
-                                     :jid jid}}
-                :last-receive-time nil)
-    :none (assoc op :command :exit)
+  (if (= :all correlation-id)
+    (assoc op :command :reconnect
+           :body {:form-params {:client "runner"
+                                :fun "jobs.print_job"
+                                :jid jid}}
+           :last-receive-time nil)
     (assoc op :command :receive)))
 
 (defn- handle-receive-data-from-minion
+  "Extract minion response from data and remove return minion
+   from list of expected minion responses"
   [{:keys [:minions] :as op} data]
   (assoc op
          :command :send
@@ -176,22 +200,23 @@
   [op data]
   (assoc op
          :command :send
-         :body {:return (:return data)
-                :success (:success data)}))
+         :body (select-keys data [:return :success])))
 
 (defn- handle-receive-data
   [{:keys [:master-client? :job-tag] :as op}
    {:keys [:tag :data]}]
   (if (and tag data (str/starts-with? tag job-tag))
-    (if master-client?
+    (if master-client?                  ; data from master (runner, wheel)
+                                        ; differs from minion return data
       (handle-receive-data-from-master op data)
       (handle-receive-data-from-minion op data))
-    (assoc op :command :receive :body nil)))
+    (assoc op :command :receive :body nil))) ; ignore job data
+                                        ; that has not been requested
 
 (defn- handle-receive-timeout
-  "If job have not returns from minions, run saltutil.find_job with local client.
-   This request must be executed with sync client, because if minions will not
-   respond, events will not appear on eventbus."
+  "If job have not returns from minions, run saltutil.find_job.
+   This request must be executed with sync local client, because if minions does
+   not respond, there are no events to be delivered on eventbus."
   [{:keys [:jid :minions] :as op}]
   (assoc op :command :find-job
          :body {:form-params {:client "local"
@@ -204,24 +229,32 @@
   [op [channel {:keys [:type] :as msg}]]
   (if (= :receive channel)
     (if (instance? Throwable msg)
-      (assoc op :command :error :body msg)
+      (assoc op :command :error :body msg) ; respond with error
       (if (= :connected type)
         (handle-receive-connection op msg)
         (if (nil? msg)
-          (assoc op :command :exit)
+          (assoc op :command :exit)        ; exit when SSE stream has been closed
           (handle-receive-data op msg))))
-    (handle-receive-timeout op)))
+    (handle-receive-timeout op)))          ; job has not respond within find-job-timeout
 
 (defn- handle-unsubscribe
-  "If unsubcribe is sucessful exit, ignore messages received while unsubcribing."
-  [op [channel]]
-  (assoc op :command (if (= :unsubscribe channel) :exit :unsubscribe)))
+  "Exit if successfully unsubscribed
+  If message has been received (deadlock prevention) ignore the message and
+  continue in `:unsubscribe`, if channel has been closed, `:exit`."
+  [op [channel msg]]
+  (case channel
+    :unsubscribe (assoc op :command :exit)
+    :receive (assoc op :command (if (nil? msg) :exit :unsubscribe))))
 
 (defn- handle-with-command
   [op command]
   (assoc op :command command))
 
 (defn handle-response
+  "Handles response of command.
+  Called after command has been executed and response has been received.
+  This function just dispatches handler based on operation command
+  and returns new operation with new command"
   [{:keys [:command] :as op} response]
   (try
     (case command
@@ -243,18 +276,18 @@
   (if (sequential? x) x (vector x)))
 
 (defn- find-job-timeout
-  "Find job timeout is not computed in handler function but has to be computed in go block, because go block could be parked for period of time."
+  "Find job timeout is not computed in handler function, but has to be computed
+   in go block, because go block could be parked for period of time."
   [timeout last-request-time]
   (if last-request-time
     (- (+ last-request-time timeout) (System/currentTimeMillis))
-    Integer/MAX_VALUE))
+    Integer/MAX_VALUE))                 ; todo request timeout on master nodes?
 
 (defn- graceful-shutdown
-  "Graceful shutdown in three steps
-  Async request is already unsubscribed but there could be unread responses.
-  1. close recv-channel - no more minion responses could be delivered
-  2. read pending minion responses and throw them away
-  3. close resp-channel"
+  "Graceful shutdown:
+  1. Close recv-chan - no new minion responses will be delivered
+  2. Read pending minion responses and throw them away
+  3. Close resp-chan"
   [recv-chan resp-chan]
   (a/close! recv-chan)
   (->> (repeatedly #(a/poll! recv-chan))
@@ -262,7 +295,7 @@
   (a/close! resp-chan))
 
 (defn request-async
-  "Subscribe with `sse-subs-chan`, invoke async client request and deliver responses in resp-chan.
+  "Subscribe with `:sse-subs-chan`, invoke async client request and deliver responses in resp-chan.
 
   This function uses [[salt.client.request/request]] to call async client.
   Channel will deliver:
@@ -271,12 +304,9 @@
 
   This function implements best practices for working with salt-api as defined in
   https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#best-practices
-  If SSE reconnect occurs during the call, jobs.print_job is used to retrieve
-  the state of job.
-
-  Channel is closed after all minions return.
-  Request will be merged with client default-http-request.
-  See [[salt.client/client]] for more details."
+  Channel is closed after all minions return
+  or master returns (in case of runner ane wheel).
+  See [[salt.client/client]] for configuration options."
   [client-atom req resp-chan]
   (let [correlation-id (java.util.UUID/randomUUID)
         client @client-atom
@@ -290,22 +320,22 @@
            (case command
              :subscribe (a/>! subs-chan body)
              :connect (a/<! recv-chan)
-             :request (a/<! (req/request client-atom body))
+             :request (a/<! (req/request client-atom body (a/chan)))
              :receive (let [timeout-chan (a/timeout
                                           (find-job-timeout minion-timeout
                                                             last-receive-time))]
                         (a/alt!
                           timeout-chan [:timeout]
                           recv-chan ([result] [:receive result])))
-             :reconnect (a/<! (request-async client-atom body (a/chan)))
-             :find-job (a/<! (req/request client-atom body))
+             :reconnect (a/<! (req/request client-atom body (a/chan)))
+             :find-job (a/<! (req/request client-atom body (a/chan)))
              :send (doseq [b (to-vec body)]
                      (a/>! resp-chan b))
              :error (a/>! resp-chan body)
-             ;; read receive channel while unsubscribing to prevent deadlock
              :unsubscribe (a/alt!
                             [[subs-chan body]] [:unsubscribe]
-                            recv-chan ([msg] [:receive msg]))
+                            recv-chan ([msg] [:receive msg])
+                            :priority true)
              :exit (graceful-shutdown recv-chan resp-chan))
            (handle-response op)
            (recur)))))

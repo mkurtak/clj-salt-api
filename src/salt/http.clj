@@ -40,7 +40,7 @@
                         resp))))))
 
 (defn- connect
-  "Connects deferred created in `create-deferred-fn`  with core.async `resp-chan`"
+  "Connects deferred created in `create-deferred-fn` with core.async `resp-chan`"
   [create-deferred-fn resp-chan]
   (try (d/on-realized (d/catch
                           (create-deferred-fn)
@@ -188,7 +188,7 @@
   If SSE request could not be made, exception is written to the channel and channel is closed."
   ([req] (sse req {}))
   ([req pool-opts]
-   (let [resp-chan (a/chan 1)]         ; todo how to set buffer size?
+   (let [resp-chan (a/chan)]         ; todo how to set buffer size?
      (connect (fn [] (-> (http/request (merge req {:throw-exceptions? false
                                                    :pool (sse-pool pool-opts)}))
                          (d/chain response->channel-response

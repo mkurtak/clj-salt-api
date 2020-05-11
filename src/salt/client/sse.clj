@@ -66,7 +66,7 @@
     (if (and (= :unauthorized (::s/response-category (ex-data response)))
              (not (max-retries-reached op))) ; prevent endless loop between request and login
       (assoc op
-             :command :login            ; login if request received unauthorized
+             :command :login            ; login if unauthorized response received
              :body (req/create-login-request op)
              :sse-retries (inc sse-retries)) ; inc sse-retries to prevent endless loop
       (error-op op response))
@@ -114,13 +114,14 @@
     (handle-receive-event op msg)))
 
 (defn- handle-send-subscription
-  "Subscription and body has not been sent.
+  "Subscription received when sending response.
+
   This could happen in deadlock prevention mechanism.
   Dispatch subscription by type
-  * `:subscribe` increase subscriber and conj reply to subscriber to current body and send
+  * `:subscribe` increase subscriber and conj reply to subscriber to current body to send
   * `:unsubscribe` decrease subscriber count and if
      ** operation is [[closeable?]] `:close`
-     ** no subscribers`:receive
+     ** no subscribers `:receive` (not closeable but no subscribers => keep-alive)
      ** otherwise continue with sending
   * `:exit` exit"
   [{:keys [:subscription-count :body] :as op}
@@ -139,7 +140,7 @@
     :exit (assoc op :command :exit)))
 
 (defn- handle-send
-  "Response could be sent or subscription could be received
+  "Response sent or subscription received
   If response is sent
   * `:receive` command next SSE event, if there is no other msg to sent
   * `:send` msg if there is something in msg this is the case of received
@@ -181,13 +182,13 @@
     :exit (assoc op :command :exit)))
 
 (defn- handle-error-subscription
-  "Error has not been sent an subscription has been received instead.
+  "Error has not been sent and subscription has been received instead.
 
   Dispatch subscription by type:
   * `:subscribe` increase and error-send again, there is no need to reply
                  with correlation-id because sse is in error state.
                  So either it will try to reconnect (it has subscribers)
-                 or it will send error
+                 or it will send an error
   * `:unsubscribe` just decrease subscribers and error-send again
                    same reasons for staying in error state as for :subscribe
   * `:exit` exit"
@@ -196,12 +197,12 @@
   (case type
     :subscribe (assoc op
                       :subscription-count (inc subscription-count)
-                      :command :error-send
-                      :body nil)
-    :unsubscribe (assoc op
-                        :subscription-count (max 0 (dec subscription-count))
-                        :command :error-send
-                        :body nil)
+                      :command :error-send)
+    :unsubscribe (as-> op next
+                   (assoc next :subscription-count (dec subscription-count))
+                   (assoc next :command (if (= 0 (:subscription-count next))
+                                          :error-timeout
+                                          :error-send)))
     :exit (assoc op :command :exit)))
 
 (defn- handle-error-send
@@ -219,7 +220,7 @@
     (assoc op
            :command :close
            :sse-retries retries
-           :retry-timeout (* retries retry-timeout))))
+           :retry-timeout (min 5000 (* retries retry-timeout)))))
 
 (defn handle-response
   "Handles response of command.
@@ -247,13 +248,10 @@
   "Tap/Untap sse-mult on recv-chan as side-effect and return msg."
   [{:keys [:sse-mult]} {:keys [:type :recv-chan] :as msg}]
   (case type
-    :subscribe (do
-                 (a/tap sse-mult recv-chan)
-                 msg)
-    :unsubscribe (do
-                   (a/untap sse-mult recv-chan)
-                   msg)
-    msg))
+    :subscribe (a/tap sse-mult recv-chan)
+    :unsubscribe (a/untap sse-mult recv-chan)
+    msg)
+  msg)
 
 (defn- unsubscribe-all!
   [{:keys [:sse-mult]}]
@@ -266,7 +264,7 @@
 (defn graceful-shutdown
   "Graceful shutdown:
   1. Close HTTP connection to SSE `/events` endpoint
-  2. Close subs-chan no more subscriptions can be accepted
+  2. Close subs-chan no new subscriptions can be accepted
   3. unblock pending subscribers - subscribers that have already sent
      a subscription message and are blocking on subs-chan
   4. send `:connected` `:none` message to subscribers but do not wait for response.
@@ -279,40 +277,30 @@
   (->> (repeatedly #(a/poll! subs-chan))
        (map #(subscription! op %))
        (take-while identity))
-  (a/put! resp-chan (connected-message :none))
   (unsubscribe-all! op)
   (a/close! resp-chan))
 
 (defn sse
   "Invoke [[salt.api/sse]] request and returns `resp-chan` which deliver SSE events, subscription responses and error.
 
-  This function
-  * logs in user if not already logged in and handles unauthorized exception
-  * creates infinite go-loop that listens to `subs-chan` and write SSE to `resp-chan`
+  This function creates go-loop that connects to SSE events, listens to
+  `subs-chan` and write SSE to `resp-chan`. It handles errors and authentication.
 
-  To receive SSE events client should:
-  - put {:type :subscribe :correlation-id} to subs-chan
-  - take  connection response from `resp-chan` {:type :connect :correlation-id}
-  - execute [[salt.client.request/request]] with async client and remember job id
-  - take SSE events and wait for job id response
-
-  Details:
-
-  Takes values from `subs-chan`
+   Messages taken from `subs-chan`:
   | Key                | Description |
   | -------------------| ------------|
   | :type :subscribe   | Add subscriber with correlation id
   | :type :unsubscribe | Remove subscriber with correlation id
   | :type :exit        | Quit go-loop
 
-  Channel will deliver:
+  Responses delivered to `resp-chan`:
   | Response         | Description |
   | -----------------| ------------|
   | Exception        | Error occurs and SSE could not be delivered (e.g. connection error and reconnect fails). Client should return error.
   | `:type :data`    | SSE event. Body is parsed from JSON.
-  | `:type :connect` | When subscription is made (with :correlation-id set) or on reconnect with :correlation-id :all or subscription error occurs (:error is set)
+  | `:type :connect` | When subscription is made (with :correlation-id set) or on reconnect with :correlation-id set to :all
 
-  Behavior of this go-loop is specified with [[salt.client/client]]"
+  See [[salt.client/client]] for configuration options."
   ([client-atom subs-chan] (sse client-atom subs-chan (a/chan) {}))
   ([client-atom subs-chan resp-chan] (sse client-atom subs-chan resp-chan {}))
   ([client-atom subs-chan resp-chan req]
@@ -334,13 +322,15 @@
                                :priority true)
                     :send (let [b (to-vec body)]
                             (a/alt!
+                              subs-chan ([msg] (subscription-resp op msg))
                               [[resp-chan (first b)]] [:send (next b)]
-                              subs-chan ([msg] (subscription-resp op msg))))
+                              :priority true))
                     :close (api/close-sse connection)
                     :park [:subscription (subscription! op (a/<! subs-chan))]
                     :error-send (a/alt!
+                                  subs-chan ([msg] (subscription-resp op msg))
                                   [[resp-chan body]] [:send body]
-                                  subs-chan ([msg] (subscription-resp op msg)))
+                                  :priority true)
                     :error-timeout (a/<! (a/timeout retry-timeout))
                     :exit (graceful-shutdown op connection subs-chan resp-chan))
                   (handle-response op)

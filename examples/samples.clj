@@ -149,7 +149,7 @@
                                  :tgt "*"
                                  :fun "cmd.run"
                                  :arg ["sleep 20"]}})]
-    (a/<!! (a/timeout 2000))
+    (a/<!! (a/timeout 3000))
     (salt/close cl)
     (print-and-close cl res-chan)))
 
