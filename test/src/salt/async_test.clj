@@ -14,16 +14,17 @@
   [r]
   (u/submap?
    {:command :send
-    :body [{:minion "m1", :return "Done!", :success true}]} r))
+    :body [{:minion "minion1", :return "Done!", :success true}]} r))
 
 (defn- send-minion-failure?
-  [r]
-  (u/submap?
-   {:command :send
-    :body [{:minion "m1"
-            :success false}]} r))
+  ([r] (send-minion-failure? r "minion1"))
+  ([r minion-id]
+   (u/submap?
+    {:command :send
+     :body [{:minion minion-id
+             :success false}]} r)))
 
-(defn- empty-resp
+(defn- send-resp
   [op]
   (async/handle-response op nil))
 
@@ -106,44 +107,44 @@
     (testing "data test for correct, inconpatible and different jid data"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :request (:command r))) (connected-resp :all)
 
-       (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
-       (is (= :send (:command r))) (minion-event-resp "1" "m1")
-       (is (= :receive (:command r))) (empty-resp)
+       (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
+       (is (= :send (:command r))) (minion-event-resp "job-1" "minion1")
+       (is (= :receive (:command r))) (send-resp)
        (is (= :receive (:command r))) (minion-incompatible-event-resp)
-       (is (= :receive (:command r))) (minion-event-resp "2" "m2")
-       (is (= :send (:command r))) (minion-event-resp "1" "m2")
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (= :receive (:command r))) (minion-event-resp "2" "minion2")
+       (is (= :send (:command r))) (minion-event-resp "job-1" "minion2")
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))
     (testing "master client"
       (u/test-flow->
        (initial-op {:form-params
                     {:url "test" :client "runner_async"}} correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :request (:command r))) (connected-resp :all)
-       (is (= :receive (:command r))) (master-event-resp "1")
-       (is (= :send (:command r))) (master-request-resp "1")
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (= :receive (:command r))) (master-event-resp "job-1")
+       (is (= :send (:command r))) (master-request-resp "job-1")
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))
     (testing "data subscription after connect"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :request (:command r))) (connected-resp :all)
-       (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
+       (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
        (is (= :receive (:command r))) (receive-connected-resp "random-correlation-id")
        (is (= :receive (:command r))) (receive-connected-resp correlation-id)
-       (is (= :send (:command r))) (minion-event-resp "1" "m2")
-       (is (= :receive (:command r))) (empty-resp)
-       (is (= :send (:command r))) (minion-event-resp "1" "m1")
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (= :send (:command r))) (minion-event-resp "job-1" "minion2")
+       (is (= :receive (:command r))) (send-resp)
+       (is (= :send (:command r))) (minion-event-resp "job-1" "minion1")
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))
     (testing "another request subscription"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :connect (:command r))) (connected-resp "random-correlation-id")
        (is (= :request (:command r))) (connected-resp correlation-id)))))
 
@@ -152,25 +153,25 @@
     (testing "connect error"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :error (:command r))) (error-resp)
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))
     (testing "request error"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :request (:command r))) (connected-resp :all)
        (is (= :error (:command r))) (error-resp)
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))
     (testing "invalid minions request"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :request (:command r))) (connected-resp :all)
        (is (= :error (:command r))) (empty-request-resp)
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))))
 
 (deftest async-reconnect-test
@@ -178,68 +179,68 @@
     (testing "async reconnect receive data from event and print_job"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :request (:command r))) (connected-resp :all)
-       (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
+       (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
        (is (= :reconnect (:command r))) (receive-connected-resp :all)
-       (is (send-minion-success? r)) (print-job-resp "1" ["m1"])
-       (is (= :receive (:command r))) (empty-resp)
-       (is (= :send (:command r))) (minion-event-resp "1" "m2")
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (send-minion-success? r)) (print-job-resp "job-1" ["minion1"])
+       (is (= :receive (:command r))) (send-resp)
+       (is (= :send (:command r))) (minion-event-resp "job-1" "minion2")
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))
 
     (testing "async reconnect error"
       (u/test-flow->
        (initial-op correlation-id) r
-       (is (= :connect (:command r))) (empty-resp)
+       (is (= :connect (:command r))) (send-resp)
        (is (= :request (:command r))) (connected-resp :all)
-       (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
+       (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
        (is (= :reconnect (:command r))) (receive-connected-resp :all)
        (is (= :error (:command r))) (error-resp)
-       (is (= :unsubscribe (:command r))) (empty-resp)
+       (is (= :unsubscribe (:command r))) (send-resp)
        (is (= :exit (:command r))) (unsubscribe-resp)))))
 
 (deftest async-minion-timeout-test
   (testing "async minion job timeout"
     (u/test-flow->
      (initial-op (java.util.UUID/randomUUID)) r
-     (is (= :connect (:command r))) (empty-resp)
+     (is (= :connect (:command r))) (send-resp)
      (is (= :request (:command r))) (connected-resp :all)
-     (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
+     (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
      (is (= :find-job (:command r))) (timeout-resp)
-     (is (send-minion-failure? r)) (find-job-resp ["m1"] ["m2"])
-     (is (= :receive (:command r))) (empty-resp)
-     (is (= :send (:command r))) (minion-event-resp "1" "m2")
-     (is (= :unsubscribe (:command r))) (empty-resp)
+     (is (send-minion-failure? r "minion1")) (find-job-resp ["minion1"] ["minion2"])
+     (is (= :receive (:command r))) (send-resp)
+     (is (= :send (:command r))) (minion-event-resp "job-1" "minion2")
+     (is (= :unsubscribe (:command r))) (send-resp)
      (is (= :exit (:command r))) (unsubscribe-resp)))
   (testing "async minion job timeout and error"
     (u/test-flow->
      (initial-op (java.util.UUID/randomUUID)) r
-     (is (= :connect (:command r))) (empty-resp)
+     (is (= :connect (:command r))) (send-resp)
      (is (= :request (:command r))) (connected-resp :all)
-     (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
+     (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
      (is (= :find-job (:command r))) (timeout-resp)
      (is (send-minion-failure? r)) (error-resp)
-     (is (= :unsubscribe (:command r))) (empty-resp)
+     (is (= :unsubscribe (:command r))) (send-resp)
      (is (= :exit (:command r))) (unsubscribe-resp))))
 
 (deftest async-client-shutdown
   (testing "async connect request graceful shutdown"
     (u/test-flow->
      (initial-op (java.util.UUID/randomUUID)) r
-     (is (= :connect (:command r))) (empty-resp)
-     (is (= :exit (:command r))) (empty-resp)))
+     (is (= :connect (:command r))) (send-resp)
+     (is (= :exit (:command r))) (send-resp)))
   (testing "async receive request graceful shutdown"
     (u/test-flow->
      (initial-op (java.util.UUID/randomUUID)) r
-     (is (= :connect (:command r))) (empty-resp)
+     (is (= :connect (:command r))) (send-resp)
      (is (= :request (:command r))) (connected-resp :all)
-     (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
+     (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
      (is (= :exit (:command r))) (exit-resp)))
   (testing "async receive request closed client"
     (u/test-flow->
      (initial-op (java.util.UUID/randomUUID)) r
-     (is (= :connect (:command r))) (empty-resp)
+     (is (= :connect (:command r))) (send-resp)
      (is (= :request (:command r))) (connected-resp :all)
-     (is (= :receive (:command r))) (minion-request-resp "1" ["m1" "m2"])
+     (is (= :receive (:command r))) (minion-request-resp "job-1" ["minion1" "minion2"])
      (is (= :exit (:command r))) (exit-resp))))

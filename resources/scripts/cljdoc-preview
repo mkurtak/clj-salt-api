@@ -5,7 +5,7 @@ mkdir -p /tmp/cljdoc
 version=$(grep '<version>' pom.xml | head -1 | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
 
 echo "---- cljdoc preview: installing jar in local repo"
-clj -A:jar & clj -A:install
+clj -A:jar && clj -A:install
 
 echo "---- cljdoc preview: ingesting clj-salt-api"
 docker run --rm -v "$PWD:/clj-salt-api" \

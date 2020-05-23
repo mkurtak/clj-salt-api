@@ -111,7 +111,7 @@
   {:type :retry
    :retry (Short/parseShort (str/trim (second (last fields))))})
 
-(defn- not-sse-comment?
+(defn- not-comment-line?
   [field]
   (not= ':' (first field)))
 
@@ -119,18 +119,23 @@
   [field]
   (= :retry (first field)))
 
+(defn- split-buffer
+  [buf]
+  (let [buf-splits (str/split buf last-empty-line-pattern 2)
+        can-split? (< 1 (count buf-splits))
+        chunks (when can-split? (str/split (first buf-splits) empty-line-pattern))
+        next-buffer (if can-split? (second buf-splits) (first buf-splits))]
+    [chunks next-buffer]))
+
 (defn sse-buffer->events
   "Converts sse buffer to collection of events and next buffer value"
   [buf prev-buf]
-  (let [buf-splits (str/split (str prev-buf buf) last-empty-line-pattern 2)
-        no-splits (= 1 (count buf-splits))
-        chunks (if no-splits nil (str/split (first buf-splits) empty-line-pattern))
-        next-prev (if no-splits (first buf-splits) (second buf-splits))]
+  (let [[chunks next-buf] (split-buffer (str prev-buf buf))]
     [(->> chunks
           (mapcat (fn [chunk]
                     (->> chunk
                          (str/split-lines)
-                         (filter not-sse-comment?)
+                         (filter not-comment-line?)
                          (map line->field)
                          (filter sse-supported-field?)
                          (group-by retry-field?)
@@ -139,7 +144,7 @@
                                   (if retry?
                                     (reduce-retry-fields fields)
                                     (reduce-sse-fields fields)))))))))
-     next-prev]))
+     next-buf]))
 
 (defn mapcat-with-accumulator
   "Returns transducer similar to mapcat but with accumulator.
@@ -151,7 +156,7 @@
      (let [acc (volatile! nil)]
        (fn
          ([] (rf))
-         ([result] (rf result))         ; todo what to do with remaining pv?
+         ([result] (rf result))         ; TODO what to do with remaining pv?
          ([result input]
           (let [[items next-acc-val] (f input @acc)]
             (vreset! acc next-acc-val)
@@ -188,7 +193,7 @@
   If SSE request could not be made, exception is written to the channel and channel is closed."
   ([req] (sse req {}))
   ([req pool-opts]
-   (let [resp-chan (a/chan)]         ; todo how to set buffer size?
+   (let [resp-chan (a/chan)]         ; TODO how to set buffer size?
      (connect (fn [] (-> (http/request (merge req {:throw-exceptions? false
                                                    :pool (sse-pool pool-opts)}))
                          (d/chain response->channel-response

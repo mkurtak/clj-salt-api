@@ -281,7 +281,7 @@
   [timeout last-request-time]
   (if last-request-time
     (- (+ last-request-time timeout) (System/currentTimeMillis))
-    Integer/MAX_VALUE))                 ; todo request timeout on master nodes?
+    Integer/MAX_VALUE))                 ; TODO request timeout on master nodes?
 
 (defn- graceful-shutdown
   "Graceful shutdown:
@@ -307,7 +307,7 @@
   Channel is closed after all minions return
   or master returns (in case of runner ane wheel).
   See [[salt.client/client]] for configuration options."
-  [client-atom req resp-chan]
+  [client-atom req async-resp-chan]
   (let [correlation-id (java.util.UUID/randomUUID)
         client @client-atom
         subs-chan (:sse-subs-chan client)
@@ -330,13 +330,13 @@
              :reconnect (a/<! (req/request client-atom body (a/chan)))
              :find-job (a/<! (req/request client-atom body (a/chan)))
              :send (doseq [b (to-vec body)]
-                     (a/>! resp-chan b))
-             :error (a/>! resp-chan body)
+                     (a/>! async-resp-chan b))
+             :error (a/>! async-resp-chan body)
              :unsubscribe (a/alt!
                             [[subs-chan body]] [:unsubscribe]
                             recv-chan ([msg] [:receive msg])
                             :priority true)
-             :exit (graceful-shutdown recv-chan resp-chan))
+             :exit (graceful-shutdown recv-chan async-resp-chan))
            (handle-response op)
            (recur)))))
-    resp-chan))
+    async-resp-chan))

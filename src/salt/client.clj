@@ -22,7 +22,7 @@
   Assoc `:sse-subs-chan` and `:sse-resp-chan` in `client-atom`"
   [client-atom]
   (let [subs-chan (a/chan)              ; no buffer for subscription channel
-        resp-chan (a/chan)]
+        resp-chan (a/chan)]             ; TODO channel size?
     (sse/sse client-atom subs-chan resp-chan)
     (swap! client-atom assoc
            :sse-subs-chan subs-chan

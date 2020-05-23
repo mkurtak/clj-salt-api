@@ -95,7 +95,7 @@
 
 (defn- handle-receive-event
   [{:keys [:subscription-count] :as op}
-   {:keys [:type] :as event}]
+   {:keys [:type :data :retry] :as event}]
   (if (instance? Throwable event)       ; SSE sent an error
     (assoc op :command :send :body event)
     (if (nil? type)                     ; SSE has been closed
@@ -103,8 +103,8 @@
       (if (= 0 subscription-count)
         (assoc op :command :receive)    ; ignore event if there is no subscriber
         (case type
-          :data (assoc op :command :send :body (:data event))
-          :retry (assoc op :command :receive :retry-timeout (:retry event))
+          :data (assoc op :command :send :body data)
+          :retry (assoc op :command :receive :retry-timeout retry)
           :close (assoc op :command :receive))))))
 
 (defn- handle-receive
@@ -166,7 +166,7 @@
 
   Dispatch subscription by type:
   * `:subscribe` wake up and start again with validate command
-  * `:unsubscribe` stays in park (todo: is this valid?)
+  * `:unsubscribe` stays in park (TODO: is this valid?)
   * `:exit` exit"
   [{:keys [:subscription-count :retry-timeout :sse-retries] :as op}
    [_ {:keys [:type]}]]
