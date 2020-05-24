@@ -1,6 +1,6 @@
 {:src ["src"]
- :deps {org.clojure/core.async {:mvn/version "0.7.559"}
-        cheshire               {:mvn/version "5.9.0"}
+ :deps {org.clojure/core.async {:mvn/version "1.2.603"}
+        cheshire               {:mvn/version "5.10.0"}
         aleph                  {:mvn/version "0.4.7-alpha5"}}
  :aliases {:test {:extra-paths ["test/src"]}
            :runner {:extra-deps
@@ -16,7 +16,7 @@
            :outdated {:extra-deps {olical/depot {:mvn/version "1.8.4"}}
                       :main-opts ["-m" "depot.outdated.main"]}
            ;; - these rely on having a pom.xml file and, for deployment, these two
-           ;;   environment variables: CLOJARS_USERNAME, CLOJARS_PASSWORD
+           ;;   environment variables: CLOJARS_USERNAME, CLOJARS_PASSWORD (user-token)
            :install {:extra-deps {deps-deploy {:mvn/version "0.0.9"}}
                      :main-opts ["-m" "deps-deploy.deps-deploy" "install"
                                  "target/clj-salt-api.jar"]}
