@@ -1,6 +1,6 @@
 ;; Copyright (c) Michal Kurťák
 ;; All rights reserved.
-(ns salt.http
+(ns ^:no-doc salt.http
   (:require [aleph.http :as http]
             [byte-streams :as bs]
             [cheshire.core :as json]

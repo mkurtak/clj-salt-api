@@ -1,6 +1,6 @@
-;; Copyright (c) Michal Kurťák
 ;; All rights reserved.
-(ns salt.client.events
+;; Copyright (c) Michal Kurťák
+(ns ^:no-doc salt.client.events
   (:require [clojure.core.async :as a]))
 
 (defn initial-op

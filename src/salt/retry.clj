@@ -1,6 +1,6 @@
 ;; Copyright (c) Cognitect, Inc.
 ;; All rights reserved.
-(ns salt.retry
+(ns ^:no-doc salt.retry
   "Retry was copied and modified version of retry.clj from https://github.com/cognitect-labs/aws-api. This software is licensed under same license and original Copyright statements included in this file."
   (:require [clojure.core.async :as a]
             [salt.core :as s]))

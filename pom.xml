@@ -3,8 +3,17 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>clj-salt-api</groupId>
   <artifactId>clj-salt-api</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1-SNAPSHOT</version>
   <name>clj-salt-api</name>
+  <description>Saltstack salt-api client library for Clojure</description>
+  <url>https://github.com/mkurtak/clj-salt-api</url>
+  <licenses>
+    <license>
+      <name>Apache License 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
   <scm>
     <connection>scm:git:https://github.com/mkurtak/clj-salt-api</connection>
     <developerConnection>scm:git:https://github.com/mkurtak/clj-salt-api</developerConnection>

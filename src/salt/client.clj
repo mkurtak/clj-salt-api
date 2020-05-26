@@ -9,7 +9,7 @@
             [salt.client.sse :as sse]
             [salt.core :as s]))
 
-(defn client-not-started
+(defn ^:no-doc client-not-started
   "Create client atom with default values. Do not start sse."
   [opts]
   (atom (merge {::s/eauth "pam"
@@ -18,7 +18,7 @@
                 ::s/sse-buffer-size 100}
                opts)))
 
-(defn- client-start
+(defn- ^:no-doc client-start
   "Start `sse/sse` and create channels subs and resp channels for communication.
 
   Creates `subs-chan` without buffer. Buffer is not needed because subscriber
@@ -75,11 +75,11 @@
 (defn request
   "Executes salt request. Puts one response or error to `resp-chan`.
 
-  `client-atom` client created with [[salt.client/client]]
-  `req` ring request map (see [[aleph.http/request]] documentation).
+  - `client-atom` client created with [[salt.client/client]]
+  - `req` ring request map (see [[aleph.http/request]] documentation).
          This is plain salt-api HTTP request data
          merged with client  `::salt.core/default-http-request`
-  `resp-chan` core.async channel to deliver response. defaults to chan
+  - `resp-chan` core.async channel to deliver response. defaults to chan
 
   `resp-chan` will deliver:
   - Parsed salt-api response body
@@ -93,12 +93,15 @@
 (defn request-async
   "Executes salt request on async client. Puts master/minion responses or error to `resp-chan`.
 
-  `client-atom` client created with [[salt.client/client]]
-  `req` ring request map (see [[aleph.http/request]] documentation).
+  - `client-atom` client created with [[salt.client/client]]
+  - `req` ring request map (see [[aleph.http/request]] documentation).
         This is plain salt-api HTTP request data
         merged with client  `::salt.core/default-http-request`.
         Async request reuses salt client `:timeout` form parameter in the same
         manner as https://docs.saltstack.com/en/latest/ref/clients/index.html#salt.client.LocalClient
+  - `resp-chan` core.async channel to deliver response. defaults to chan
+  - `recv-buffer-size` buffer size for core.async recv channel from [[salt.client.sse]]
+
   `resp-chan` core.async channel to deliver response. defaults to chan
 
   `resp-chan` will deliver:
@@ -119,9 +122,10 @@
 (defn events
   "Listen to saltstack data events. Puts all events and sse errors to `resp-chan`.
 
-  `client-atom` client created with [[salt.client/client]]
-  `cancel-chan` core.async channel to receive cancel message. defaults to chan
-  `resp-chan` core.async channel to deliver response. defaults to chan
+  - `client-atom` client created with [[salt.client/client]]
+  - `cancel-chan` core.async channel to receive cancel message. defaults to chan
+  - `resp-chan` core.async channel to deliver response. defaults to chan
+  - `recv-buffer-size` buffer size for core.async recv channel from [[salt.client.sse]]
 
   `resp-chan` will deliver:
   - data events (retry events will not be delivered)

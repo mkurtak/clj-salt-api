@@ -1,6 +1,6 @@
 ;; Copyright (c) Michal Kurťák
 ;; All rights reserved.
-(ns salt.client.sse
+(ns ^:no-doc salt.client.sse
   (:require [clojure.core.async :as a]
             [salt.api :as api]
             [salt.core :as s]

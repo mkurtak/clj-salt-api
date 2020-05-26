@@ -1,6 +1,6 @@
 ;; Copyright (c) Michal Kurťák
 ;; All rights reserved.
-(ns salt.api
+(ns ^:no-doc salt.api
   (:require
    [clojure.core.async :as a]
    [clojure.string :as str]
