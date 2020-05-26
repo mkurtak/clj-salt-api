@@ -190,25 +190,24 @@
   | `:retry`   | :retry     | SSE indicates to set retry-timeout.
   | `:close`   |            | Sent before stream and respective core.async channel is closed.
 
-  If SSE request could not be made, exception is written to the channel and channel is closed."
-  ([req] (sse req {}))
-  ([req pool-opts]
-   (let [resp-chan (a/chan)]         ; TODO how to set buffer size?
-     (connect (fn [] (-> (http/request (merge req {:throw-exceptions? false
-                                                   :pool (sse-pool pool-opts)}))
-                         (d/chain response->channel-response
-                                  :body
-                                  #(do (a/>!! resp-chan {:type :connect
-                                                         :stream %})
-                                       %)
-                                  #(ms/map bs/to-string %)
-                                  #(ms/filter some? %)
-                                  #(ms/transform (mapcat-with-accumulator
-                                                  sse-buffer->events)
-                                                 %)
-                                  #(ms/map (fn [x] (a/>!! resp-chan x) x) %)
-                                  #(ms/reduce (fn [r _] r) {:type :close} %))))
-              resp-chan))))
+  If SSE request could not be made, exception is written to the channel and channel is closed.
+  "
+  [req pool-opts resp-chan]
+  (connect (fn [] (-> (http/request (merge req {:throw-exceptions? false
+                                                :pool (sse-pool pool-opts)}))
+                      (d/chain response->channel-response
+                               :body
+                               #(do (a/>!! resp-chan {:type :connect
+                                                      :stream %})
+                                    %)
+                               #(ms/map bs/to-string %)
+                               #(ms/filter some? %)
+                               #(ms/transform (mapcat-with-accumulator
+                                               sse-buffer->events)
+                                              %)
+                               #(ms/map (fn [x] (a/>!! resp-chan x) x) %)
+                               #(ms/reduce (fn [r _] r) {:type :close} %))))
+           resp-chan))
 
 (defn close-sse
   "Close manifold stream if any."

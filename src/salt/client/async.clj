@@ -307,11 +307,11 @@
   Channel is closed after all minions return
   or master returns (in case of runner ane wheel).
   See [[salt.client/client]] for configuration options."
-  [client-atom req async-resp-chan]
+  [client-atom req async-resp-chan recv-buffer-size]
   (let [correlation-id (java.util.UUID/randomUUID)
         client @client-atom
         subs-chan (:sse-subs-chan client)
-        recv-chan (a/chan)]
+        recv-chan (if (< 1 recv-buffer-size) (a/chan) (a/chan recv-buffer-size))]
     (a/go
       (loop [{:keys [:command :body :last-receive-time :minion-timeout] :as op}
              (initial-op req correlation-id recv-chan)]

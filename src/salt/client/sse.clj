@@ -25,15 +25,14 @@
   (if (not (closeable? op)) :validate :park))
 
 (defn initial-op
-  ([client-atom resp-chan] (initial-op client-atom resp-chan {}))
-  ([client-atom resp-chan req]
-   (let [op {:request req
-             :retry-timeout 500
-             :subscription-count 0
-             :sse-retries 0
-             :sse-mult (a/mult resp-chan)
-             :client @client-atom}]
-     (assoc op :command (initial-command op)))))
+  [client-atom resp-chan]
+  (let [op {:request (::s/default-sse-request @client-atom)
+            :retry-timeout 500
+            :subscription-count 0
+            :sse-retries 0
+            :sse-mult (a/mult resp-chan)
+            :client @client-atom}]
+    (assoc op :command (initial-command op))))
 
 (defn- error-op
   "Send error only if maximum retries exceeded."
@@ -166,7 +165,7 @@
 
   Dispatch subscription by type:
   * `:subscribe` wake up and start again with validate command
-  * `:unsubscribe` stays in park (TODO: is this valid?)
+  * `:unsubscribe` stays in park
   * `:exit` exit"
   [{:keys [:subscription-count :retry-timeout :sse-retries] :as op}
    [_ {:keys [:type]}]]
@@ -301,38 +300,37 @@
   | `:type :connect` | When subscription is made (with :correlation-id set) or on reconnect with :correlation-id set to :all
 
   See [[salt.client/client]] for configuration options."
-  ([client-atom subs-chan] (sse client-atom subs-chan (a/chan) {}))
-  ([client-atom subs-chan resp-chan] (sse client-atom subs-chan resp-chan {}))
-  ([client-atom subs-chan resp-chan req]
-   (a/go (loop [{:keys [command body retry-timeout]
-                 {sse-chan :chan :as connection} :connection
-                 {pool-opts ::s/default-sse-pool-opts} :client
-                 :as op}
-                (initial-op client-atom resp-chan req)]
-           (when command
-             (->> (case command
-                    :validate nil
-                    :login (a/<! (api/login body))
-                    :swap-login (req/swap-login! client-atom op)
-                    :request (let [ch (api/sse body pool-opts)]
-                               [:sse (a/<! ch) ch])
-                    :receive (a/alt!
-                               subs-chan ([msg] (subscription-resp op msg))
-                               sse-chan ([msg] [:sse msg])
-                               :priority true)
-                    :send (let [b (to-vec body)]
-                            (a/alt!
+  [client-atom subs-chan resp-chan]
+  (a/go (loop [{:keys [command body retry-timeout]
+                {sse-chan :chan :as connection} :connection
+                {pool-opts ::s/default-sse-pool-opts
+                 sse-buffer-size ::s/sse-buffer-size} :client
+                :as op}
+               (initial-op client-atom resp-chan)]
+          (when command
+            (->> (case command
+                   :validate nil
+                   :login (a/<! (api/login body))
+                   :swap-login (req/swap-login! client-atom op)
+                   :request (let [ch (api/sse body pool-opts sse-buffer-size)]
+                              [:sse (a/<! ch) ch])
+                   :receive (a/alt!
                               subs-chan ([msg] (subscription-resp op msg))
-                              [[resp-chan (first b)]] [:send (next b)]
-                              :priority true))
-                    :close (api/close-sse connection)
-                    :park [:subscription (subscription! op (a/<! subs-chan))]
-                    :error-send (a/alt!
-                                  subs-chan ([msg] (subscription-resp op msg))
-                                  [[resp-chan body]] [:send body]
-                                  :priority true)
-                    :error-timeout (a/<! (a/timeout retry-timeout))
-                    :exit (graceful-shutdown op connection subs-chan resp-chan))
-                  (handle-response op)
-                  (recur)))))
-   resp-chan))
+                              sse-chan ([msg] [:sse msg])
+                              :priority true)
+                   :send (let [b (to-vec body)]
+                           (a/alt!
+                             subs-chan ([msg] (subscription-resp op msg))
+                             [[resp-chan (first b)]] [:send (next b)]
+                             :priority true))
+                   :close (api/close-sse connection)
+                   :park [:subscription (subscription! op (a/<! subs-chan))]
+                   :error-send (a/alt!
+                                 subs-chan ([msg] (subscription-resp op msg))
+                                 [[resp-chan body]] [:send body]
+                                 :priority true)
+                   :error-timeout (a/<! (a/timeout retry-timeout))
+                   :exit (graceful-shutdown op connection subs-chan resp-chan))
+                 (handle-response op)
+                 (recur)))))
+  resp-chan)

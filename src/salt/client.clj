@@ -14,15 +14,23 @@
   [opts]
   (atom (merge {::s/eauth "pam"
                 ::s/sse-keep-alive? true
-                ::s/max-sse-retries 3} opts)))
+                ::s/max-sse-retries 3
+                ::s/sse-buffer-size 100}
+               opts)))
 
 (defn- client-start
   "Start `sse/sse` and create channels subs and resp channels for communication.
 
+  Creates `subs-chan` without buffer. Buffer is not needed because subscriber
+  has to wait for subscription response anyway.
+
+  Creates `sse-resp-chan` without buffer. Buffer is not needed because mult
+  is created on this channel, so buffers should be set on taps.
+
   Assoc `:sse-subs-chan` and `:sse-resp-chan` in `client-atom`"
   [client-atom]
-  (let [subs-chan (a/chan)              ; no buffer for subscription channel
-        resp-chan (a/chan)]             ; TODO channel size?
+  (let [subs-chan (a/chan)
+        resp-chan (a/chan)]
     (sse/sse client-atom subs-chan resp-chan)
     (swap! client-atom assoc
            :sse-subs-chan subs-chan
@@ -45,6 +53,8 @@
                                          merged with all requests
   - `::salt.core/default-sse-pool-opts`- optional, default connection pool opts,
                                          see `aleph` documentation for more details.
+  - `::salt.core/default-sse-request`  - optional, default ring request to for sse
+                                         it is merged with `::salt.core/default-http-requet`
   - `::salt.core/sse-keep-alive?`      - optional, if true /events SSE connection
                                          will be always kept open,
                                          if false /events SSE connection will be
@@ -55,7 +65,10 @@
                                          If number of errors exceeds this value,
                                          all async request receive an error and
                                          SSE behaves as sse-keep-alive? false,
-                                         defaults to 3"
+                                         defaults to 3
+  - `::salt.core/sse-buffer-size`      - optional, sse-chan core.async buffer size,
+                                         defaults to 100"
+
   [opts]
   (client-start (client-not-started opts)))
 
@@ -73,7 +86,7 @@
   - Exception if error occurs (with response in meta)
 
   Channel is closed after response is delivered."
-  ([client-atom req] (request client-atom req (a/chan)))
+  ([client-atom req] (request client-atom req (a/chan 100)))
   ([client-atom req resp-chan]
    (req/request client-atom req resp-chan)))
 
@@ -99,9 +112,9 @@
   the state of job.
 
   Channel is closed after response is delivered."
-  ([client-atom req] (request-async client-atom req (a/chan)))
-  ([client-atom req resp-chan]
-   (async/request-async client-atom req resp-chan)))
+  ([client-atom req] (request-async client-atom req (a/chan 100) 100))
+  ([client-atom req resp-chan recv-buffer-size]
+   (async/request-async client-atom req resp-chan recv-buffer-size)))
 
 (defn events
   "Listen to saltstack data events. Puts all events and sse errors to `resp-chan`.
@@ -115,10 +128,10 @@
   - exceptions if saltstack sse encounters an error
 
   To cancel and close `resp-chan`, send some message to `cancel-chan`."
-  ([client-atom] (events client-atom (a/chan) (a/chan)))
-  ([client-atom cancel-chan] (events client-atom cancel-chan (a/chan)))
-  ([client-atom cancel-chan resp-chan]
-   (events/events client-atom cancel-chan resp-chan)))
+  ([client-atom] (events client-atom (a/chan) (a/chan 100) 100))
+  ([client-atom cancel-chan] (events client-atom cancel-chan (a/chan 100) 100))
+  ([client-atom cancel-chan resp-chan recv-buffer-size]
+   (events/events client-atom cancel-chan resp-chan recv-buffer-size)))
 
 (defn revoke-session
   "Logs out user from saltstack."

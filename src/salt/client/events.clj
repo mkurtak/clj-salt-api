@@ -89,19 +89,22 @@
   - Parsed SSE events
 
   If you want to stop and close resp-chan, put whatever value to `cancel-chan`
-  
+
   If error occurs, this events stream is not stopped (unsubscibed), but continue
   listening to events. This causes [[`salt.client/sse`]] to retry connection again,
   if it fails again, another error is delivered and so on.
   This behavior is needed to inform events consumers, there is an error on
-  underlining saltstack eventstream.
+  underlining saltstack events stream.
+
+  events recv channel does not use buffer, because it does not block or park and
+  passes all messages to resp-chan.
 
   See [[salt.client/client]] for more details."
-  [client-atom cancel-chan resp-chan]
+  [client-atom cancel-chan resp-chan recv-buffer-size]
   (let [correlation-id (java.util.UUID/randomUUID)
         client @client-atom
         subs-chan (:sse-subs-chan client)
-        recv-chan (a/chan)]
+        recv-chan (if (< 1 recv-buffer-size) (a/chan) (a/chan recv-buffer-size))]
     (a/go
       (loop [{:keys [:command :body] :as op}
              (initial-op correlation-id recv-chan)]

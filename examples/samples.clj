@@ -120,7 +120,8 @@
                                        (str "Listing grains for '" minion "':\n"
                                             (reduce-kv
                                              #(str %1 %2 ":" %3 "\n") "" return)))))
-                                 identity)))))
+                                 identity)
+                         1))))
 
 (defn runner-async-manage-present
   "Demonstrates runner async client."

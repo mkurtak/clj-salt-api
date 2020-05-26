@@ -128,14 +128,14 @@
   | ------------------------------| ------------|
   | `::salt.core/master-url`      | Base url of salt-master. It is preepended :url
   | `::salt.core/login-response`  | Response from [[salt.api/login]]"
-  ([req] (sse req {}))
-  ([req pool-opts]
-   (retry/with-retry
-     #(http/sse (create-sse-request req) pool-opts)
-     (a/chan 1 (comp                    ;todo channel size?
-                (map throw-err)
-                (map http/parse-sse))
-             identity))))
+  [req pool-opts sse-buffer-size]
+  (http/sse (create-sse-request req)
+            pool-opts
+            (a/chan sse-buffer-size
+                    (comp
+                     (map throw-err)
+                     (map http/parse-sse))
+                    identity)))
 
 (defn close-sse
   [connection]

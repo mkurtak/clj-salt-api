@@ -177,6 +177,30 @@ Deadlock n.2 is not so obvious as n.1 and took me some time to find the root cau
 * `pkg.installed` is parked in taking response from `jobs.print_job` and does not take "job sent" event
 * sse is deadlock in putting "job sent" event to `sse-resp-chan` mult, because `pkg.installed` has not taken value and its buffer length is 0. clj-salt-api uses non zero length buffer on `recv-chan` in release version, but to detect deadlocks, it uses channels without buffers
 
+==== Setting buffer size
+
+One interesting topic I'd like to mention is how to set correct buffer sizes in core.async channels. General recommendation mentioned in core.async documentation is to set buffer size for slow consumers not to block quick consumers. Let's examine our channels:
+
+[cols="1,2,1"]
+|===
+| Channel | Data | Buffer size
+| `sse-chan`
+| consumer (sse go block) could be parked in sending data to async request, which could be parked taking from in find_job or print_job
+| buffer needed
+| `subs-chan`
+| consumer (sse go block) could be parked, but async request has to wait for subscription response, so it could be blocked in putting message to `subs-chan`
+| no buffer needed
+| `sse-resp-chan`
+| mult exists on top of this channel
+| no buffer needed
+| `recv-chan`
+| one consumer (async request) could be parked in taking from find_job or print_job
+| buffer needed
+| `async-resp-chan`
+| consumer is outside of clj-salt-client, so it will be better to pass the channel as a parameter
+| not applicable
+|===
+
 == Code conventions
 I have struggled with code readability at first. All functions looked similar and I had problems to understand function body after some time passed.
 
