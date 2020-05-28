@@ -437,9 +437,38 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 </head>
-<body class="article">
+<body class="article toc2 toc-left">
 <div id="header">
 <h1>Walkthrough</h1>
+<div id="toc" class="toc2">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#_clojure_and_saltstack">Clojure and Saltstack</a></li>
+<li><a href="#_motivation">Motivation</a>
+<ul class="sectlevel2">
+<li><a href="#_saltstack_asynchronous_workflow">Saltstack asynchronous workflow</a></li>
+<li><a href="#_other_features">Other features</a></li>
+</ul>
+</li>
+<li><a href="#_basic_architecture">Basic architecture</a>
+<ul class="sectlevel2">
+<li><a href="#_error_handling">Error handling</a></li>
+<li><a href="#_state_handling">State handling</a></li>
+<li><a href="#_caveats">Caveats</a></li>
+</ul>
+</li>
+<li><a href="#_code_conventions">Code conventions</a>
+<ul class="sectlevel2">
+<li><a href="#_destructuring_function_arguments">Destructuring function arguments</a></li>
+<li><a href="#_small_functions">Small functions</a></li>
+<li><a href="#_comments">Comments</a></li>
+<li><a href="#_passing_data_down">Passing data down</a></li>
+</ul>
+</li>
+<li><a href="#_testing">Testing</a></li>
+<li><a href="#_future_work">Future work</a></li>
+</ul>
+</div>
 </div>
 <div id="content">
 <div id="preamble">
@@ -448,7 +477,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <p>clj-salt-api is data oriented Clojure library for interacting with Saltstack through <a href="http://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#module-salt.netapi.rest_cherrypy.app">salt-api</a></p>
 </div>
 <div class="paragraph">
-<p>The aim of this document is to provide motivation, decisions, code samples and caveats behind clj-salt-api. This is my first Clojure project, so I have created this document for me as a developer to understand (and remember) decisions with their benefits and drawbacks, but it can serve as documentation for everyone interested in this library.</p>
+<p>The aim of this document is to provide motivation, decisions, code samples and caveats behind clj-salt-api. This is my first Clojure project, so I have created this document for me as a developer to understand (and remember) decisions with their benefits and drawbacks, but it can serve as a documentation for everyone interested in this library.</p>
 </div>
 </div>
 </div>
@@ -456,7 +485,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <h2 id="_clojure_and_saltstack"><a class="anchor" href="#_clojure_and_saltstack"></a><a class="link" href="#_clojure_and_saltstack">Clojure and Saltstack</a></h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p><a href="https://docs.saltstack.com">Saltstack</a> is a configuration management and orchestration tool with solid remote execution framework. Salt is written in Python and leverages <a href="https://zeromq.org/">ZeroMQ messaging library</a>, which allows users to run tasks simultaneously with satisfying performance.</p>
+<p><a href="https://docs.saltstack.com">Saltstack</a> is a configuration management and orchestration tool with a solid remote execution framework. Salt is written in Python and leverages <a href="https://zeromq.org/">ZeroMQ messaging library</a>, which allows users to run tasks simultaneously with satisfying performance.</p>
 </div>
 <div class="paragraph">
 <p>Saltstack architecture is very flexible, it provides master-client (master-minion), master-less or ssh slaves setup. There are basically three options to interact with Salt master:</p>
@@ -479,10 +508,10 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 <hr>
 <div class="paragraph">
-<p><a href="https://clojure.org/">Clojure</a> is well known programming language. Although the main reason why I have chosen Clojure is Clojure itself ;), it has several interesting properties that suite this project well.</p>
+<p><a href="https://clojure.org/">Clojure</a> is a well known programming language. Although the main reason why I have chosen Clojure is Clojure itself ;), it has several interesting properties that suite this project well.</p>
 </div>
 <div class="paragraph">
-<p>With Clojure dynamic nature and very good data structures, clj-salt-api supports almost all Salt modules. clj-salt-api sends requests to Salt as data (Clojure maps) and returns data back. This approach is heavily inspired by <a href="https://github.com/cognitect-labs/aws-api">aws-api</a>. It makes API very simple and there are no differences to Saltstack API. Therefore user of clj-salt-api can benefit from <a href="https://docs.saltstack.com/en/latest/">Saltstack official documentation</a> and this library has minimal compatibility issues with different Saltstack versions.</p>
+<p>With Clojure dynamic nature and very good data structures, clj-salt-api supports almost all Salt modules. clj-salt-api sends requests to Salt as data (Clojure maps) and returns data back. This approach is heavily inspired by <a href="https://github.com/cognitect-labs/aws-api">aws-api</a>. It makes the API very simple and there are no differences to the Saltstack API. Therefore user of clj-salt-api can benefit from <a href="https://docs.saltstack.com/en/latest/">Saltstack official documentation</a> and this library has minimal compatibility issues with different Saltstack versions.</p>
 </div>
 <div class="paragraph">
 <p>Salstack provides both synchronous and asynchronous API. clj-salt-api aims to support both approaches and Clojure asynchronous/multi-threading solutions can ensure clean design.</p>
@@ -508,10 +537,10 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="sect2">
 <h3 id="_saltstack_asynchronous_workflow"><a class="anchor" href="#_saltstack_asynchronous_workflow"></a><a class="link" href="#_saltstack_asynchronous_workflow">Saltstack asynchronous workflow</a></h3>
 <div class="paragraph">
-<p>Implementation of salt-api asynchronous requests relies on <a href="https://docs.saltstack.com/en/master/topics/event/events.html">event system</a> and <a href="https://docs.saltstack.com/en/getstarted/event/index.html">event-driven infrastructure</a>. Salt&#8217;s internal components communicate with each other by sending and listening to events. Each command has dedicated job with unique <em>job-id</em>. "Job sents" and "job returns" are represented as events on saltstack event-bus.</p>
+<p>Implementation of salt-api asynchronous requests relies on the <a href="https://docs.saltstack.com/en/master/topics/event/events.html">event system</a> and the <a href="https://docs.saltstack.com/en/getstarted/event/index.html">event-driven infrastructure</a>. Salt&#8217;s internal components communicate with each other by sending and listening to events. Each command has dedicated job with unique <em>job-id</em>. "Job sents" and "job returns" are represented as events on the saltstack event-bus.</p>
 </div>
 <div class="paragraph">
-<p>Salt-api <code>/events</code> endpoint exposes Salt event-bus as HTTP stream formatted per the <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">Server Sent Events (SSE) spec</a>. Each event is formatted as JSON.</p>
+<p>Salt-api <code>/events</code> endpoint exposes the Salt event-bus as HTTP stream formatted per the <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">Server Sent Events (SSE) spec</a>. Each event is formatted as JSON.</p>
 </div>
 <div class="paragraph">
 <p>Simplified asynchronous request flow (as described <a href="https://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#long-running-http-connections">here</a>):</p>
@@ -519,16 +548,16 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Connect to <code>/events</code> endpoint and buffer all events.</p>
+<p>Connect to the <code>/events</code> endpoint and buffer all events.</p>
 </li>
 <li>
-<p>Send HTTP request with async client (<a href="https://docs.saltstack.com/en/latest/topics/netapi/index.html#salt.netapi.NetapiClient.local_async">local_async</a>, <a href="https://docs.saltstack.com/en/latest/topics/netapi/index.html#salt.netapi.NetapiClient.runner_async">runner_async</a> or <a href="https://docs.saltstack.com/en/latest/topics/netapi/index.html#salt.netapi.NetapiClient.wheel_async">wheel_async</a>) and receive <em>job-id</em> and target minions (if appropriate) in response. Runner and wheel clients run on master, so there is no reason to parse target minions.</p>
+<p>Send a POST request with async client (<a href="https://docs.saltstack.com/en/latest/topics/netapi/index.html#salt.netapi.NetapiClient.local_async">local_async</a>, <a href="https://docs.saltstack.com/en/latest/topics/netapi/index.html#salt.netapi.NetapiClient.runner_async">runner_async</a> or <a href="https://docs.saltstack.com/en/latest/topics/netapi/index.html#salt.netapi.NetapiClient.wheel_async">wheel_async</a>) and receive a <em>job-id</em> and target minions (if appropriate) in response. Runner and wheel clients run on the master, so there is no reason to parse the target minions.</p>
 </li>
 <li>
-<p>Filter events buffer for "job return" events with expected <em>job-id</em> and <em>minion-id</em> and deliver response to caller.</p>
+<p>Filter the events buffer for "job return" events with the expected <em>job-id</em> and <em>minion-id</em> and deliver the response.</p>
 </li>
 <li>
-<p>Listen to remaining (expected) "job return" events with expected <em>job-id</em> and deliver minion response to caller.</p>
+<p>Listen to remaining (expected) "job return" events with the expected <em>job-id</em> and <em>minion_id</em> deliver the response.</p>
 </li>
 </ol>
 </div>
@@ -538,30 +567,30 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="ulist">
 <ul>
 <li>
-<p>One or more target minions have not sent "job return" event within specified timeout</p>
+<p>One or more target minions have not sent "job return" event within the specified timeout</p>
 <div class="ulist">
 <ul>
 <li>
 <p>Execute <a href="https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job">saltutil.find_job</a> function on timed out minions to check the job result.</p>
 </li>
 <li>
-<p>If <a href="https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job">saltutil.find_job</a> returns an error, deliver error response for all timed out minions.</p>
+<p>If <a href="https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job">saltutil.find_job</a> returns an error, deliver the error response for all timed out minions.</p>
 </li>
 <li>
-<p>If <a href="https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job">saltutil.find_job</a> returns successfully, but response contains minion failures, deliver error response for failed minions and continue processing "job return events" until all expected minions return.</p>
+<p>If <a href="https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job">saltutil.find_job</a> returns successfully, but the response contains minion failures, deliver the error response for failed minions and continue processing "job return events" until all expected minions return.</p>
 </li>
 </ul>
 </div>
 </li>
 <li>
-<p><code>/events</code> endpoint has been closed during asynchronous request</p>
+<p>The <code>/events</code> endpoint has been closed during asynchronous request</p>
 <div class="ulist">
 <ul>
 <li>
-<p>If it is not possible to reconnect within specified backoff strategy, deliver error and close async request.</p>
+<p>If it is not possible to reconnect within the specified timeout, deliver the error and close the request.</p>
 </li>
 <li>
-<p>If connection to <code>/events</code> endpoint has been successfully reopened, fetch "job returns" with <a href="https://docs.saltstack.com/en/latest/ref/runners/all/salt.runners.jobs.html#salt.runners.jobs.print_job">jobs.print_job</a> function. Deliver responses for already finished minions and continue processing of "job return events" until all expected minions return.</p>
+<p>If connection to the <code>/events</code> endpoint has been successfully reopened, fetch "job returns" with <a href="https://docs.saltstack.com/en/latest/ref/runners/all/salt.runners.jobs.html#salt.runners.jobs.print_job">jobs.print_job</a> function. Deliver the responses for already finished minions and continue processing of "job return events" until all expected minions return.</p>
 </li>
 </ul>
 </div>
@@ -575,7 +604,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <i class="fa icon-note" title="Note"></i>
 </td>
 <td class="content">
-Saltstack does not send <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation"><code>Last-Event-ID</code></a> header when reconnecting to <code>/events</code>, so client has to fetch job results with runner job module.
+Saltstack does not send <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation"><code>Last-Event-ID</code></a> header when reconnecting to <code>/events</code>, so client has to fetch the job results with runner job module.
 </td>
 </tr>
 </table>
@@ -591,16 +620,20 @@ Saltstack does not send <a href="https://html.spec.whatwg.org/multipage/server-s
 <tbody>
 <tr>
 <th class="tableblock halign-left valign-top"><p class="tableblock">Authentication</p></th>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Saltstack requires user to authenticate. clj-salt-api authenticates user, handles token expiration and automatic re-authentication under the hood.</p></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Saltstack requires users to authenticate. clj-salt-api authenticates user, handles token expiration and automatic re-authentication under the hood.</p>
+</div></div></td>
 </tr>
 <tr>
 <th class="tableblock halign-left valign-top"><p class="tableblock">Synchronous requests</p></th>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Besides support for asynchronous workflow, clj-salt-api also enables synchronous requests</p></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Besides support for asynchronous workflow, clj-salt-api also enables synchronous (but non-blocking) requests.</p>
+</div></div></td>
 </tr>
 <tr>
 <th class="tableblock halign-left valign-top"><p class="tableblock">Tread-safety when executing parallel requests</p></th>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p>clj-salt-api allows to execute multiple requests (async or sync) in parallel with only one connection to <code>/events</code> endpoint. This connection can be set up in two modes:</p>
+<p>clj-salt-api allows to execute multiple requests (async or sync) in parallel with only one connection to the <code>/events</code> endpoint. This connection can be set up in two modes:</p>
 </div>
 <div class="ulist">
 <ul>
@@ -615,19 +648,27 @@ Saltstack does not send <a href="https://html.spec.whatwg.org/multipage/server-s
 </tr>
 <tr>
 <th class="tableblock halign-left valign-top"><p class="tableblock">Stream of all events</p></th>
-<td class="tableblock halign-left valign-top"><p class="tableblock">clj-salt-api provides an API for listening to all events on Saltstack event-bus.</p></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>clj-salt-api provides an API for listening to all events on Saltstack event-bus.</p>
+</div></div></td>
 </tr>
 <tr>
 <th class="tableblock halign-left valign-top"><p class="tableblock">Graceful shutdown</p></th>
-<td class="tableblock halign-left valign-top"><p class="tableblock">It is common, that Salt commands could take several minutes (e.g. package management commands). So there is need to shutdown client and correctly cancel running requests.</p></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>It is common, that Salt commands could take several minutes (e.g. package management commands). So there is need to shutdown client and correctly cancel running requests.</p>
+</div></div></td>
 </tr>
 <tr>
 <th class="tableblock halign-left valign-top"><p class="tableblock">HTTP support</p></th>
-<td class="tableblock halign-left valign-top"><p class="tableblock">clj-salt-api relies on HTTP when communicating with Saltstack. It needs to support various HTTP features (Authentication, Proxy, Custom Headers, &#8230;&#8203;)</p></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>clj-salt-api relies on HTTP when communicating with Saltstack. It needs to support various HTTP features (Authentication, Proxy, Custom Headers, &#8230;&#8203;)</p>
+</div></div></td>
 </tr>
 <tr>
 <th class="tableblock halign-left valign-top"><p class="tableblock">Retries with backoff policies</p></th>
-<td class="tableblock halign-left valign-top"><p class="tableblock">clj-salt-api executes number of remote calls and as we all know network can be unreliable.</p></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>clj-salt-api executes number of remote calls and as we all know network can be unreliable.</p>
+</div></div></td>
 </tr>
 </tbody>
 </table>
@@ -638,7 +679,7 @@ Saltstack does not send <a href="https://html.spec.whatwg.org/multipage/server-s
 <h2 id="_basic_architecture"><a class="anchor" href="#_basic_architecture"></a><a class="link" href="#_basic_architecture">Basic architecture</a></h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Simplified sketch of asynchronous flow design:</p>
+<p>The architecture is based on two types of go blocks and several channels (<code>sse-chan</code>, <code>subs-chan</code>,<code>sse-resp-chan</code>, <code>recv-chan</code> and <code>async-resp-chan</code>).  Simplified sketch of asynchronous flow design:</p>
 </div>
 <div class="imageblock text-center">
 <div class="content">
@@ -648,25 +689,25 @@ Saltstack does not send <a href="https://html.spec.whatwg.org/multipage/server-s
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Sse (go block) is started during <a href="../src/salt/client.clj">client initialization</a>. It listens to subscriptions with <code>subs-chan</code> and sends sse events or subscription responses to <code>sse-resp-chan</code> with attached <a href="https://clojuredocs.org/clojure.core.async/mult">mult</a>.</p>
+<p>Sse (go block) is started during initialization. It listens to subscriptions with the <code>subs-chan</code> and sends sse events or subscription responses to the <code>sse-resp-chan</code> with attached <a href="https://clojuredocs.org/clojure.core.async/mult">mult</a>.</p>
 </li>
 <li>
-<p>For each async request clj-salt-api creates a <code>recv-chan</code> and starts a new go block which delivers responses to <code>async-resp-chan</code>.</p>
+<p>When async request is executed by a caller, clj-salt-api creates a <code>recv-chan</code> and an <code>async-resp-chan</code> and starts a new go block which delivers responses to the <code>async-resp-chan</code>.</p>
 </li>
 <li>
-<p>Async request (go block) subscribes to sse events by sending subscription to <code>subs-chan</code> with unique <code>correlation-id</code>.</p>
+<p>Async request (go block) subscribes to sse events by sending a subscription to the <code>subs-chan</code> with a unique <code>correlation-id</code>.</p>
 </li>
 <li>
-<p>After sse receives subscription with <code>correlation-id</code> through <code>subs-chan</code>, it copies <code>sse-resp-chan</code> (with <a href="https://clojuredocs.org/clojure.core.async/tap">tap</a>) to <code>recv-chan</code> and makes sure its connected to <code>/events</code> endpoint. The state of <code>/events</code> connection depends on keep-alive setting.</p>
+<p>After sse receives subscription with the <code>correlation-id</code> through the <code>subs-chan</code>, it copies the <code>sse-resp-chan</code> (with <a href="https://clojuredocs.org/clojure.core.async/tap">tap</a>) to the <code>recv-chan</code> and makes sure its connected to the <code>/events</code> endpoint. The state of <code>/events</code> connection depends on keep-alive setting.</p>
 </li>
 <li>
-<p>Only after sse is connected to <code>/events</code>, it sends the subscription response with corresponding <code>correlation-id</code> back to <code>sse-resp-chan</code>.</p>
+<p>Only after sse is connected to <code>/events</code>, it sends the subscription response with the corresponding <code>correlation-id</code> back to the <code>sse-resp-chan</code>.</p>
 </li>
 <li>
-<p>When async request receives the subscription response, it submits its job (module function call) to saltstack and receives <code>job-id</code> and target minions back (if appropriate).</p>
+<p>When async request receives the subscription response, it submits its job (module function call) to saltstack and receives a <code>job-id</code> and target minions back (if appropriate).</p>
 </li>
 <li>
-<p>Async request waits for responses of all target minions, delivers them to <code>async-resp-chan</code> as they come and closes the <code>async-resp-chan</code>.</p>
+<p>Async request waits for responses of all target minions, delivers them to the <code>async-resp-chan</code> as they come and closes the <code>async-resp-chan</code>.</p>
 </li>
 </ol>
 </div>
@@ -694,7 +735,7 @@ clj-salt-api implements similar flow for <em>all events stream</em>.
 <div class="ulist">
 <ul>
 <li>
-<p>async request just delivers minion error to caller</p>
+<p>async request just delivers minion error to the caller</p>
 </li>
 </ul>
 </div>
@@ -704,17 +745,17 @@ clj-salt-api implements similar flow for <em>all events stream</em>.
 <div class="ulist">
 <ul>
 <li>
-<p>sse tries to reconnect to <code>/events</code> endpoint</p>
+<p>sse tries to reconnect to the <code>/events</code> endpoint</p>
 </li>
 <li>
-<p>if reconnection is successful,</p>
+<p>if the reconnection is successful,</p>
 <div class="ulist">
 <ul>
 <li>
-<p>sse sends reconnected message to <code>sse-resp-chan</code></p>
+<p>sse sends a reconnected message to the <code>sse-resp-chan</code></p>
 </li>
 <li>
-<p>all running async requests have to fetch job result with <a href="https://docs.saltstack.com/en/latest/ref/runners/all/salt.runners.jobs.html#salt.runners.jobs.print_job">jobs.print_job</a>, because job can be already finished and "job return" event has been missed (saltstack does not support <code>Last-Event-ID</code> concept)</p>
+<p>all running async requests have to fetch a job result with <a href="https://docs.saltstack.com/en/latest/ref/runners/all/salt.runners.jobs.html#salt.runners.jobs.print_job">jobs.print_job</a>, because the job can be already finished and "job return" event has been missed (saltstack does not support <code>Last-Event-ID</code> concept)</p>
 </li>
 <li>
 <p>all running async requests deliver already finished jobs and continue consuming <code>recv-chans</code> until all expected minion responses are delivered</p>
@@ -723,23 +764,23 @@ clj-salt-api implements similar flow for <em>all events stream</em>.
 </div>
 </li>
 <li>
-<p>if reconnection is not successful, all running async requests deliver error and close respective `async-resp-chan`s</p>
+<p>if the reconnection is not successful, all running async requests deliver an error and close respective `async-resp-chan`s</p>
 </li>
 </ul>
 </div>
 </li>
 <li>
-<p>minion timed out ("job return" event has not been delivered within specified time)</p>
+<p>minion has timed out ("job return" event has not been delivered within the specified time)</p>
 <div class="ulist">
 <ul>
 <li>
-<p>async request executes <a href="https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job">saltutil.find_job</a> to check job status</p>
+<p>async request executes <a href="https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job">saltutil.find_job</a> to check the job status</p>
 </li>
 <li>
-<p>if <code>saltutil.find_job</code> fails, async request delivers error and close respective <code>async-resp-chan</code></p>
+<p>if <code>saltutil.find_job</code> fails, async request delivers the error and closes the <code>async-resp-chan</code></p>
 </li>
 <li>
-<p>if <code>saltutil.find_job</code> succeeds, async request deliver only failed minions and waits for events from remaining with <code>recv-chan</code></p>
+<p>if <code>saltutil.find_job</code> succeeds, async request deliver only failed minions and waits for events from remaining minions with the <code>recv-chan</code></p>
 </li>
 </ul>
 </div>
@@ -753,21 +794,21 @@ clj-salt-api implements similar flow for <em>all events stream</em>.
 <p>clj-salt-api has to manage 2 types of state.</p>
 </div>
 <div class="paragraph">
-<p>The first one is simple. Its client related information like salt master settings, salt token, <code>subs-chan</code> etc. clj-salt-api uses atom (referred as <code>client-atom</code> in code) to hold this information.</p>
+<p>The first one is simple. Its client related information like the salt master settings, salt token, <code>subs-chan</code> etc. clj-salt-api uses atom (referred as <code>client-atom</code> in code) to hold this information.</p>
 </div>
 <div class="paragraph">
-<p>The second one is trickier. clj-salt-api has a state associated with go blocks (sse, async request, all events stream and sync request). All go blocks implement solution similar to the one mentioned in <a href="https://clojuredesign.club/episode/026-one-call-to-rule-them-all/">clojuredesign.club episode 026</a>. I highly recommend clojuredesign.club podcast and want to thank Chris and Nate for sharing a lot of their knowledge.</p>
+<p>The second one is trickier. clj-salt-api has a state associated with go blocks (sse, async request, all events stream and sync request). All go blocks implement a solution similar to the one mentioned in <a href="https://clojuredesign.club/episode/026-one-call-to-rule-them-all/">clojuredesign.club episode 026</a>. I highly recommend clojuredesign.club podcast and want to thank Chris and Nate for sharing a lot of their knowledge.</p>
 </div>
 <div class="paragraph">
-<p>Each go block is a loop with state (a map named <code>op</code>) and two steps. The state (<code>op</code>) consists of current command and various data (correlation-id, list of target minions, minion timeout, number of retries, &#8230;&#8203;) specific to go block. The steps:</p>
+<p>Each go block is a loop with state (a map named <code>op</code>) and two steps. The state (<code>op</code>) consists of a command and various data (correlation-id, list of target minions, minion timeout, number of retries, &#8230;&#8203;) specific to the go block. The steps:</p>
 </div>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><code>execute-command</code> - call async function (reading/writing to channel) and returns channel message as response</p>
+<p><code>execute-command</code> - call async function (reading/writing to channel) and returns a channel message as a response</p>
 </li>
 <li>
-<p><code>handle-response</code> - pure function that accepts current state (<code>op</code>) and command response as parameters and returns new state (<code>op</code>). Go block loop stops when there is no new state returned from <code>handle-response</code>.</p>
+<p><code>handle-response</code> - pure function that accepts current state (<code>op</code>) and a command response as parameters and returns new state (<code>op</code>). Go block loop stops when there is no new state returned from <code>handle-response</code>.</p>
 </li>
 </ol>
 </div>
@@ -870,7 +911,7 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 <p>This type of deadlock is described in <a href="https://medium.com/@elizarov/deadlocks-in-non-hierarchical-csp-e5910d137cc">this article</a> by Roman Elizarov.</p>
 </div>
 <div class="paragraph">
-<p>The deadlock happens when sse tries to deliver an event with <code>sse-resp-chan</code> and async request tries to unsubscribe. Sse is blocked on sending event to <code>sse-resp-chan</code> and does not read <code>subs-chan</code> and async request is blocked on sending unsubscribe message to <code>subs-chan</code> and does not read <code>recv-chan</code> (copy of <code>sse-resp-chan</code>).</p>
+<p>The deadlock happens when sse tries to deliver an event with <code>sse-resp-chan</code> and async request tries to unsubscribe. Sse is blocked on sending the event to <code>sse-resp-chan</code> and does not read <code>subs-chan</code> and async request is blocked on sending the unsubscribe message to <code>subs-chan</code> and does not read <code>recv-chan</code> (copy of <code>sse-resp-chan</code>).</p>
 </div>
 <div class="paragraph">
 <p>To overcome this problem clj-salt-api uses <a href="https://clojuredocs.org/clojure.core.async/alt!">alt!</a> when reading/writing to pair of pub/sub channels.</p>
@@ -879,7 +920,7 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 <div class="sect3">
 <h4 id="_deadlock_n_2"><a class="anchor" href="#_deadlock_n_2"></a><a class="link" href="#_deadlock_n_2">Deadlock n. 2</a></h4>
 <div class="paragraph">
-<p>Deadlock n.2 is not so obvious as n.1 and took me some time to find the root cause. It is better explained through example. For the purpose of example, lets assume user of clj-salt-api library executes async request <code>pkg.installed</code>, but sse is reconnected during this request. As described earlier, after sse reconnection async request (<code>pkg.installed</code>) has to fetch job status with <a href="https://docs.saltstack.com/en/latest/ref/runners/all/salt.runners.jobs.html#salt.runners.jobs.print_job">jobs.print_job</a>. What happens in this scenario?</p>
+<p>Deadlock n.2 is not so obvious as the n.1 and it took me some time to find the root cause. It is better explained through an example. For the purpose of the example, lets assume the user of clj-salt-api library executes an async request <code>pkg.installed</code>, but sse is reconnected during this request. As described earlier, after sse reconnection async request (<code>pkg.installed</code>) has to fetch the job status with <a href="https://docs.saltstack.com/en/latest/ref/runners/all/salt.runners.jobs.html#salt.runners.jobs.print_job">jobs.print_job</a>. What happens in this scenario?</p>
 </div>
 <div class="ulist">
 <ul>
@@ -887,36 +928,39 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 <p>We have two running async requests (<code>pkg.installed</code> and <code>job.print_job</code>) with two different <code>recv-chans</code> tapped from <code>sse-resp-chan</code> mult.</p>
 </li>
 <li>
-<p><code>pkg.installed</code> has created new <code>async-resp-chan</code> for <code>job.print_job</code> and is parked in take from this chan (it is waiting for response from print_job)</p>
+<p><code>pkg.installed</code> has created new <code>async-resp-chan</code> for <code>job.print_job</code> and is parked in take from this chan (it is waiting for the response from print_job).</p>
 </li>
 <li>
-<p><code>job.print_job</code> has been successfully subscribed to sse and has submitted job to saltstack</p>
+<p><code>job.print_job</code> has been successfully subscribed to sse and has submitted a job to saltstack.</p>
 </li>
 <li>
-<p>"job sent" event is sent back from saltstack to <code>/events</code> endpoint and is delivered from HTTP client to sse go block</p>
+<p>"job sent" event is sent back from saltstack to the <code>/events</code> endpoint and is delivered from the HTTP client to sse go block.</p>
 </li>
 <li>
-<p>sse puts "job sent" event to <code>sse-resp-chan</code></p>
+<p>sse puts "job sent" event to <code>sse-resp-chan</code>.</p>
 </li>
 <li>
-<p>event is distributed to all taps in parallel an synchronously, which means it is put to <code>pkg.installed recv-chan</code> and <code>job.print_job recv-chan</code></p>
+<p>event is distributed to all taps in parallel an synchronously, which means it is put to <code>recv-chan</code> created for <code>pkg.installed</code> and to <code>recv-chan</code> created for <code>job.print_job</code>.</p>
 </li>
 <li>
-<p><code>job.print_job</code> takes "job sent" event and continue waiting for "job return" event (park in take from <code>recv-chan</code>)</p>
+<p><code>job.print_job</code> takes "job sent" event and continue waiting for "job return" event (park in take from <code>recv-chan</code>).</p>
 </li>
 <li>
-<p><code>pkg.installed</code> is parked in taking response from <code>jobs.print_job</code> and does not take "job sent" event</p>
+<p><code>pkg.installed</code> is parked in taking response from <code>jobs.print_job</code> and does not take "job sent" event.</p>
 </li>
 <li>
-<p>sse is deadlock in putting "job sent" event to <code>sse-resp-chan</code> mult, because <code>pkg.installed</code> has not taken value and its buffer length is 0. clj-salt-api uses non zero length buffer on <code>recv-chan</code> in release version, but to detect deadlocks, it uses channels without buffers</p>
+<p>sse is deadlocked in putting "job sent" event to <code>sse-resp-chan</code> mult, because <code>pkg.installed</code> has not taken any value and its buffer length is 0. clj-salt-api uses non zero length buffer on <code>recv-chan</code> in production code, but to detect deadlocks, it uses channels without buffers.</p>
 </li>
 </ul>
+</div>
+<div class="paragraph">
+<p>I have not found a solution to remove the deadlock when the code executes request for <code>job.print_job</code> asynchronously. The only solution that works is calling <code>job.print_job</code> synchronously (but non-blocking) using <code>local</code> client.</p>
 </div>
 </div>
 <div class="sect3">
 <h4 id="_setting_buffer_size"><a class="anchor" href="#_setting_buffer_size"></a><a class="link" href="#_setting_buffer_size">Setting buffer size</a></h4>
 <div class="paragraph">
-<p>One interesting topic I&#8217;d like to mention is how to set correct buffer sizes in core.async channels. General recommendation mentioned in core.async documentation is to set buffer size for slow consumers not to block quick consumers. Let&#8217;s examine our channels:</p>
+<p>One interesting topic I&#8217;d like to mention is how to set correct buffer sizes in core.async channels. General recommendation mentioned in core.async documentation is to set the buffer size for slow consumers. Let&#8217;s examine our channels:</p>
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
@@ -952,7 +996,7 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>async-resp-chan</code></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">consumer is outside of clj-salt-client, so it will be better to pass the channel as a parameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">consumer is outside of clj-salt-client, so it is better to pass the channel as a parameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">not applicable</p></td>
 </tr>
 </tbody>
@@ -984,7 +1028,7 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 </ol>
 </div>
 <div class="paragraph">
-<p>Another technique I have found useful <a href="#_passing_data_down">Passing data down</a> (maybe there is a better name in Clojure community, which I am not aware of).</p>
+<p>Another technique I have found useful is <a href="#_passing_data_down">Passing data down</a> (maybe there is a better name in Clojure community, which I am not aware of).</p>
 </div>
 <div class="sect2">
 <h3 id="_destructuring_function_arguments"><a class="anchor" href="#_destructuring_function_arguments"></a><a class="link" href="#_destructuring_function_arguments">Destructuring function arguments</a></h3>
@@ -996,7 +1040,8 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="CodeRay highlight"><code data-lang="clojure">  [{<span class="symbol">:keys</span> [<span class="symbol">:subscription-count</span>] <span class="symbol">:as</span> op}
+<pre class="CodeRay highlight"><code data-lang="clojure">(<span class="keyword">defn-</span> <span class="function">handle-receive-event</span>
+  [{<span class="symbol">:keys</span> [<span class="symbol">:subscription-count</span>] <span class="symbol">:as</span> op}
    {<span class="symbol">:keys</span> [<span class="symbol">:type</span> <span class="symbol">:data</span> <span class="symbol">:retry</span>] <span class="symbol">:as</span> event}]
   (<span class="keyword">if</span> (<span class="keyword">instance?</span> Throwable event)       <span class="comment">; SSE sent an error</span>
     (<span class="keyword">assoc</span> op <span class="symbol">:command</span> <span class="symbol">:send</span> <span class="symbol">:body</span> event)
@@ -1078,7 +1123,7 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 <p>explaining not obvious implementation (why this function calls sync instead of async interface)</p>
 </li>
 <li>
-<p>containing examples of passed parameters - saltstack response can be deep data structure and example of data in documentation helps to understand the body when destructuring is not possible</p>
+<p>containing examples of passed parameters - saltstack response can be deep data structure and example of data in the documentation helps to understand the body when destructuring is not possible</p>
 </li>
 </ul>
 </div>
@@ -1116,8 +1161,8 @@ It would be very helpful to have an option to monitor channels (e.g. list all co
 <div class="sect2">
 <h3 id="_passing_data_down"><a class="anchor" href="#_passing_data_down"></a><a class="link" href="#_passing_data_down">Passing data down</a></h3>
 <div class="paragraph">
-<p>Well known technique from Clojure world is to pass one data structure to functions down the pipeline and every function pickups up only values it actually needs. It does not have to understand whole data structure.
-clj-salt-api uses HTTP to communicate with salt-api and it uses <a href="https://github.com/ztellman/aleph">Aleph</a> library for this purpose. Aleph follows <a href="https://github.com/ring-clojure">Ring</a> spec and clj-salt-api request functions also accepts the same ring request map as a parameter. Passing data down has 2 advantages in this case:</p>
+<p>Well known technique from Clojure world is to pass one data structure to functions down the pipeline and every function picks up only values it actually needs. It does not have to understand the whole data structure.
+clj-salt-api uses HTTP to communicate with salt-api and it uses <a href="https://github.com/ztellman/aleph">Aleph</a> library for that purpose. Aleph follows <a href="https://github.com/ring-clojure">Ring</a> spec and clj-salt-api request functions also accepts the same ring request map as a parameter. Passing data down has 2 advantages in this case:</p>
 </div>
 <div class="ulist">
 <ul>
@@ -1125,7 +1170,7 @@ clj-salt-api uses HTTP to communicate with salt-api and it uses <a href="https:/
 <p>All HTTP related configuration is supported out-of-box (timeouts, proxy configuration, client certificates). Users can refer to official Aleph documentation.</p>
 </li>
 <li>
-<p>All Salstack modules are supported out-of-box. Users can refer to official Salstack documentation and there is no need to map from official Salstack function and clj-salt-api function.</p>
+<p>All Salstack modules are supported out-of-box. Users can refer to official Salstack documentation and there is no need to map from official Salstack function to clj-salt-api function.</p>
 </li>
 </ul>
 </div>
@@ -1158,7 +1203,7 @@ clj-salt-api uses HTTP to communicate with salt-api and it uses <a href="https:/
 <p>Besides usual unit tests for pure functions (data in/data out), I had to figure out how to test async calls. Separating all async calls to one function and implement almost all code with simple functions (mentioned <a href="#async-code">here</a>) let me simplify testing.</p>
 </div>
 <div class="paragraph">
-<p>It is important to mention that I have not applied TDD practices in clj-salt-api, because I have developed all code with REPL and added tests afterwards. I think the best granularity for testing asynchronous saltstack request is to test the flow. I have created macro <code>test-flow&#8594;</code> for that purpose (to simplify syntax).</p>
+<p>It is important to mention that I have not applied TDD practices in clj-salt-api, because I have developed all code with REPL and added tests afterwards. I think the best granularity for testing asynchronous saltstack request is to test the flow. I have created macro <code>test-flow&#8594;</code> for that purpose (to simplify the syntax).</p>
 </div>
 <div class="paragraph">
 <p>Let&#8217;s take an example:</p>
@@ -1182,31 +1227,31 @@ clj-salt-api uses HTTP to communicate with salt-api and it uses <a href="https:/
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Setup initial state (<code>op</code>)</p>
+<p>Setup the initial state (<code>op</code>)</p>
 </li>
 <li>
-<p>Create send response as a response to initial command (async request sent a subscribe message to sse)</p>
+<p>Create send response as a response to the initial command (async request sent a subscribe message to sse)</p>
 </li>
 <li>
-<p>Assert that next command is <code>:connect</code> (async request is waiting for connected message from sse)</p>
+<p>Assert that the next command is <code>:connect</code> (async request is waiting for the connected message from sse)</p>
 </li>
 <li>
 <p>Create connected response with correlation-id <code>:all</code> as a response to <code>:connect</code> command</p>
 </li>
 <li>
-<p>Assert that next command is <code>:request</code> (submitting job to saltstack)</p>
+<p>Assert that the next command is <code>:request</code> (submitting job to saltstack)</p>
 </li>
 <li>
 <p>Create response with job id <code>job-1</code> and expected minions <code>minion1</code> and <code>minion2</code> as a response to <code>:request</code> command</p>
 </li>
 <li>
-<p>Assert that next command is <code>:receive</code> (async request is waiting for minion responses)</p>
+<p>Assert that the next command is <code>:receive</code> (async request is waiting for minion responses)</p>
 </li>
 <li>
 <p>Create timeout response as a response to <code>:receive</code> (minions responses have not been delivered within specified timeout)</p>
 </li>
 <li>
-<p>Assert that next command :find-job</p>
+<p>Assert that the next command :find-job</p>
 </li>
 <li>
 <p>&#8230;&#8203;</p>
@@ -1214,7 +1259,7 @@ clj-salt-api uses HTTP to communicate with salt-api and it uses <a href="https:/
 </ol>
 </div>
 <div class="paragraph">
-<p>All handler functions could be tested separately, but to create current state (<code>op</code>) as a parameter to <code>handle-response</code> the tests need to understand internal structure. By testing flow, the test does not need internal representation of state, because the state is created with each test step. It verifies only the sequence of steps.</p>
+<p>All handler functions could be tested separately, but to create current state (<code>op</code>) as a parameter to <code>handle-response</code> the tests need to understand internal structure. By testing flow, the test does not need the internal representation of state, because the state is created with every test step. It verifies only the sequence of steps.</p>
 </div>
 </div>
 </div>
@@ -1239,7 +1284,7 @@ clj-salt-api uses HTTP to communicate with salt-api and it uses <a href="https:/
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2020-05-26 21:18:36 +0200
+Last updated 2020-05-28 22:37:51 +0200
 </div>
 </div>
 <style>
