@@ -8,6 +8,10 @@
 :link-find_job: https://docs.saltstack.com/en/latest/ref/modules/all/salt.modules.saltutil.html#salt.modules.saltutil.find_job[saltutil.find_job]
 :link-print_job: https://docs.saltstack.com/en/latest/ref/runners/all/salt.runners.jobs.html#salt.runners.jobs.print_job[jobs.print_job]
 
+ifdef::env-cljdoc[]
+WARNING: Please find the walkthrough on https://mkurtak.github.io/clj-salt-api/. clj-salt-api uses asciidoctor to generate the documentation and cljdoc does not support all asciidoctor features used in the documentation.
+endif::[]
+
 clj-salt-api is data oriented Clojure library for interacting with Saltstack through http://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#module-salt.netapi.rest_cherrypy.app[salt-api]
 
 The aim of this document is to provide motivation, decisions, code samples and caveats behind clj-salt-api. This is my first Clojure project, so I have created this document for me as a developer to understand (and remember) decisions with their benefits and drawbacks, but it can serve as a documentation for everyone interested in this library.
