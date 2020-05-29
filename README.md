@@ -1,8 +1,9 @@
-[![CircleCI](https://circleci.com/gh/mkurtak/clj-salt-api.svg?style=shield)](https://circleci.com/gh/mkurtak/clj-salt-api)
-[![codecov](https://codecov.io/gh/mkurtak/clj-salt-api/branch/master/graph/badge.svg)](https://codecov.io/gh/mkurtak/clj-salt-api)
-# clj-salt-api
+# clj-salt-api [![CircleCI](https://circleci.com/gh/mkurtak/clj-salt-api.svg?style=shield)](https://circleci.com/gh/mkurtak/clj-salt-api) [![cljdoc badge](https://cljdoc.org/badge/clj-salt-api/clj-salt-api)](https://cljdoc.org/d/clj-salt-api/clj-salt-api/CURRENT) [![Clojars Project](https://img.shields.io/clojars/v/clj-salt-api.svg)](https://clojars.org/clj-salt-api) [![codecov](https://codecov.io/gh/mkurtak/clj-salt-api/branch/master/graph/badge.svg)](https://codecov.io/gh/mkurtak/clj-salt-api)
 
 Saltstack [salt-api](http://docs.saltstack.com/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html#module-salt.netapi.rest_cherrypy.app) client library for Clojure.
+
+- [API Docs](https://cljdoc.org/d/clj-salt-api/clj-salt-api)
+- [Code walkthrough](https://mkurtak.github.io/clj-salt-api)
 
 ## Rationale
 
