@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>clj-salt-api</groupId>
   <artifactId>clj-salt-api</artifactId>
-  <version>1.0.3-SNAPSHOT</version>
+  <version>1.0.4-SNAPSHOT</version>
   <name>clj-salt-api</name>
   <description>Saltstack salt-api client library for Clojure</description>
   <url>https://github.com/mkurtak/clj-salt-api</url>
@@ -28,12 +28,12 @@
     <dependency>
       <groupId>org.clojure</groupId>
       <artifactId>core.async</artifactId>
-      <version>0.7.559</version>
+      <version>1.2.603</version>
     </dependency>
     <dependency>
       <groupId>cheshire</groupId>
       <artifactId>cheshire</artifactId>
-      <version>5.9.0</version>
+      <version>5.10.0</version>
     </dependency>
     <dependency>
       <groupId>aleph</groupId>
