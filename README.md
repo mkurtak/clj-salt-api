@@ -78,7 +78,7 @@ clj-salt-api manages single HTTP connection to /events endpoint, submits jobs to
 (def cancel-chan (a/chan))
 
 ;; Listen to saltstack eventbus, events will be delivered to events-chan
-(def events-chan (salt/events client cancel-chan))
+(def events-chan (salt/events client cancel-chan 10))
 
 ;; Take one event
 (a/<!! events-chan)
